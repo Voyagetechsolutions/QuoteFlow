@@ -185,6 +185,12 @@ function InvoiceDetail({
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={invoice.status} />
+          <button
+            onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, "_blank")}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            Download PDF
+          </button>
           {transitions.map((t) => (
             <button
               key={t.to}

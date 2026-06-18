@@ -54,6 +54,12 @@ export function QuoteDetailPage({ quoteId, navigate }: Props) {
         </div>
         <div className="flex gap-3">
           <button
+            onClick={() => window.open(`/api/quotes/${quote.id}/pdf`, "_blank")}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            Download PDF
+          </button>
+          <button
             onClick={() => navigate({ name: "quote-builder", editId: quote.id })}
             className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
           >

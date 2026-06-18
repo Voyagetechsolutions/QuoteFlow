@@ -27,6 +27,7 @@ Prereqs: Node ≥ 20, and the Python venv for extraction
 
 ```sh
 npm install
+npx playwright install chromium              # for branded quote/invoice PDFs
 npm --prefix packages/shared run build      # build shared types once
 npm --prefix apps/api run prisma:generate    # generate Prisma client
 

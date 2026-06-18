@@ -40,6 +40,11 @@ export class InvoicesService {
       result.lines = result.lines.map((l: Record<string, any>) =>
         this.serialiseLine(l),
       );
+      // findOne/updateStatus must carry `total` too (web detail renders it).
+      result.total = result.lines.reduce(
+        (sum: number, l: Record<string, any>) => sum + this.toNum(l.amount),
+        0,
+      );
     }
     return result;
   }
