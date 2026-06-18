@@ -56,6 +56,24 @@ export class QuotesService {
     return v instanceof Prisma.Decimal ? v.toNumber() : Number(v);
   }
 
+  /** Roll up line cost/sell into the totals the web client expects. */
+  private totals(lines: Array<{ costRate: any; sellRate: any }>): {
+    totalCost: number;
+    totalSell: number;
+    overallMarginPct: number;
+  } {
+    const totalCost = lines.reduce((s, l) => s + this.toNum(l.costRate), 0);
+    const totalSell = lines.reduce((s, l) => s + this.toNum(l.sellRate), 0);
+    return {
+      totalCost: Math.round(totalCost * 100) / 100,
+      totalSell: Math.round(totalSell * 100) / 100,
+      overallMarginPct:
+        totalCost > 0
+          ? Math.round(((totalSell - totalCost) / totalCost) * 10000) / 100
+          : 0,
+    };
+  }
+
   private serialiseLine(line: Record<string, any>): Record<string, any> {
     return {
       ...line,
@@ -74,6 +92,7 @@ export class QuotesService {
       result.lines = result.lines.map((l: Record<string, any>) =>
         this.serialiseLine(l),
       );
+      Object.assign(result, this.totals(result.lines));
     }
     return result;
   }
@@ -143,7 +162,7 @@ export class QuotesService {
       orderBy: { createdAt: 'desc' },
       include: {
         customer: { select: { id: true, name: true } },
-        lines: { select: { sellRate: true } },
+        lines: { select: { sellRate: true, costRate: true } },
         _count: { select: { lines: true } },
       },
     });
@@ -159,10 +178,7 @@ export class QuotesService {
       defaultMarginPct: this.toNum(q.defaultMarginPct),
       createdAt: q.createdAt,
       lineCount: q._count.lines,
-      total: q.lines.reduce(
-        (sum, l) => sum + this.toNum(l.sellRate),
-        0,
-      ),
+      ...this.totals(q.lines),
     }));
   }
 

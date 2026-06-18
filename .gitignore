@@ -39,3 +39,6 @@ Thumbs.db
 
 # Sample rate sheets (real customer data — keep out of git)
 /samples/
+
+# Local embedded Postgres data dir (ephemeral dev DB)
+/.pgdata/

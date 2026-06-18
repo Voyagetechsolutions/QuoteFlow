@@ -11,7 +11,8 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:api": "npm run dev --workspace @quoteflow/api",
-    "dev:web": "npm run dev --workspace @quoteflow/web"
+    "dev:web": "npm run dev --workspace @quoteflow/web",
+    "db": "node scripts/dev-db.cjs"
   },
   "engines": {
     "node": ">=20"
