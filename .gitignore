@@ -13,6 +13,8 @@ out/
 .env
 .env.*
 !.env.example
+*.key
+spike/.key
 
 # Logs
 *.log

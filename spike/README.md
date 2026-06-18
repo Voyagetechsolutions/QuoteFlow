@@ -33,11 +33,38 @@ reproducible; real customer rate sheets dropped in `samples/` stay out of git.
   not a fallback — so a bad extraction is a labeled 30-second fix, never a
   silent wrong number in a quote.
 
+## Vision fallback (tier 3) — `vision_extract.py`
+
+Handles scanned / image-only sheets the table parser can't: rasterize page →
+Claude vision model → JSON → **same `validate_row()` flagging** as the table
+path, so the review table behaves identically whichever extractor ran.
+
+```sh
+# no key / no spend — exercises rasterize + parse + validate via a recorded response
+spike/.venv/Scripts/python spike/vision_extract.py samples/sample_rate_sheet.pdf --dry-run --pretty
+
+# live (needs an Anthropic Console key; OAuth can't drive a script):
+ANTHROPIC_API_KEY=$(cat spike/.key) \
+  spike/.venv/Scripts/python spike/vision_extract.py samples/sample_rate_sheet.pdf --pretty
+```
+
+Status:
+- **Pipeline plumbing: verified** via `--dry-run` (9/9 rows, 0 flags, matches the
+  table path).
+- **Feasibility: confirmed** — the rasterized page (`--save-png`) is fully
+  legible; a vision model extracts it cleanly. (Cross-checked by reading the PNG
+  directly.)
+- **Live automated call: not yet run** — needs `ANTHROPIC_API_KEY`. Put the key
+  in `spike/.key` (gitignored) and run the live command above.
+- **Real-scan robustness: NOT proven.** The stand-in is a clean rasterization of
+  a clean synthetic PDF. Skew, noise, low contrast, and handwriting are
+  untested and await a real scanned sheet.
+
+Default model: `claude-sonnet-4-6` (vision + cost balance); `--model
+claude-opus-4-8` for the hardest scans.
+
 ## What the spike DELIBERATELY does not do
 
-- No LLM-vision fallback yet (that's for scanned / image-only PDFs, and needs an
-  API key). Tiered design: pdfplumber first → vision pass → always land in the
-  review table.
 - No app, DB, or UI. JSON to stdout only.
 
 ## Findings worth carrying into the real build

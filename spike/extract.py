@@ -223,9 +223,16 @@ def row_from_cells(cells: list[str], colmap: dict[str, int],
     else:
         row.currency = cur
 
-    # validation -> review flags
+    validate_row(row, raw_rate_text=rate_text)
+    return row
+
+
+def validate_row(row: RateRow, raw_rate_text: Optional[str] = None) -> RateRow:
+    """Shared review-flagging. Both the table path and the vision path call this
+    so a flag means the same thing regardless of which extractor produced it."""
     if row.rate is None:
-        row.flag(f"could not parse rate from {rate_text!r}")
+        row.flag(f"could not parse rate from {raw_rate_text!r}"
+                 if raw_rate_text else "rate missing or unparseable")
     if row.currency is None:
         row.flag("currency unknown")
     if not row.lane_origin:
