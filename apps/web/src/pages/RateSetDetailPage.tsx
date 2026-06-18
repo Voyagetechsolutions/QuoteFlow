@@ -1,0 +1,367 @@
+import { useMemo, useState, useCallback } from "react";
+import type { ExtractedRateRow } from "@quoteflow/shared";
+import { getRateSet, updateRateRow, type RateSetDetail } from "../lib/api";
+import { useAsync, cn, type NavigateFn } from "../lib/hooks";
+
+interface Props {
+  rateSetId: string;
+  navigate: NavigateFn;
+}
+
+export function RateSetDetailPage({ rateSetId, navigate }: Props) {
+  const {
+    data: rateSet,
+    loading,
+    error,
+    reload,
+  } = useAsync(() => getRateSet(rateSetId), [rateSetId]);
+
+  if (loading) return <PageSkeleton />;
+  if (error)
+    return (
+      <div className="mx-auto max-w-5xl">
+        <BackButton navigate={navigate} />
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+          {error}
+        </div>
+      </div>
+    );
+  if (!rateSet) return null;
+
+  return (
+    <ReviewTable
+      rateSet={rateSet}
+      navigate={navigate}
+      onSaved={reload}
+    />
+  );
+}
+
+/* ── Back Button ───────────────────────────────────────────────── */
+
+function BackButton({ navigate }: { navigate: NavigateFn }) {
+  return (
+    <button
+      onClick={() => navigate({ name: "rate-sets" })}
+      className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
+    >
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+      </svg>
+      Back to Rate Sets
+    </button>
+  );
+}
+
+/* ── Review Table ──────────────────────────────────────────────── */
+
+function ReviewTable({
+  rateSet,
+  navigate,
+  onSaved,
+}: {
+  rateSet: RateSetDetail;
+  navigate: NavigateFn;
+  onSaved: () => void;
+}) {
+  type RowWithId = ExtractedRateRow & { id: string };
+  const [rows, setRows] = useState<RowWithId[]>(rateSet.rows);
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+
+  // Sort: flagged rows first
+  const ordered = useMemo(
+    () =>
+      [...rows]
+        .map((row, idx) => ({ row, idx }))
+        .sort((a, b) => Number(b.row.needsReview) - Number(a.row.needsReview)),
+    [rows],
+  );
+
+  const needsReview = rows.filter((r) => r.needsReview).length;
+
+  const update = useCallback(
+    <K extends keyof ExtractedRateRow>(
+      idx: number,
+      key: K,
+      value: ExtractedRateRow[K],
+    ) => {
+      setRows((prev) =>
+        prev.map((r, i) => {
+          if (i !== idx) return r;
+          const updated = { ...r, [key]: value };
+          setDirtyIds((d) => new Set(d).add(r.id));
+          return updated;
+        }),
+      );
+    },
+    [],
+  );
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const promises = rows
+        .filter((r) => dirtyIds.has(r.id))
+        .map((r) => {
+          const { id, ...rest } = r;
+          return updateRateRow(rateSet.id, id, rest);
+        });
+      await Promise.all(promises);
+      setDirtyIds(new Set());
+      onSaved();
+    } catch {
+      alert("Failed to save some rows. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl">
+      <BackButton navigate={navigate} />
+
+      {/* Header */}
+      <div className="mt-4 mb-6">
+        <h1 className="text-2xl font-semibold text-slate-900">{rateSet.name}</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Source: <span className="font-mono">{rateSet.sourceFile}</span> · Extractor:{" "}
+          <span className="font-mono">{rateSet.extractor}</span>
+        </p>
+      </div>
+
+      {/* Stats bar */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3 text-sm text-slate-600">
+          <span>{rows.length} rows extracted</span>
+          {needsReview > 0 ? (
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+              {needsReview} need review
+            </span>
+          ) : (
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+              All clear
+            </span>
+          )}
+          {dirtyIds.size > 0 && (
+            <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+              {dirtyIds.size} unsaved
+            </span>
+          )}
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={dirtyIds.size === 0 || saving}
+          className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving ? (
+            <>
+              <Spinner /> Saving…
+            </>
+          ) : (
+            "Save Changes"
+          )}
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+              <th className="px-3 py-3 w-8">#</th>
+              <th className="px-3 py-3">Charge Type</th>
+              <th className="px-3 py-3">Origin</th>
+              <th className="px-3 py-3">Destination</th>
+              <th className="px-3 py-3">Unit</th>
+              <th className="px-3 py-3">Rate</th>
+              <th className="px-3 py-3">Ccy</th>
+              <th className="px-3 py-3">Valid From</th>
+              <th className="px-3 py-3">Valid To</th>
+              <th className="px-3 py-3">Issues</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ordered.map(({ row, idx }) => {
+              const dirty = dirtyIds.has(row.id);
+              return (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    "border-t transition-colors",
+                    row.needsReview
+                      ? "border-amber-200 bg-amber-50/70"
+                      : "border-slate-100 hover:bg-slate-50/50",
+                    dirty && "ring-1 ring-inset ring-blue-200",
+                  )}
+                >
+                  <td className="px-3 py-2 text-xs text-slate-400">{idx + 1}</td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.chargeType}
+                      onChange={(v) => update(idx, "chargeType", v)}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.laneOrigin}
+                      flagged={row.issues.includes("missing origin")}
+                      onChange={(v) => update(idx, "laneOrigin", v)}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.laneDestination}
+                      onChange={(v) => update(idx, "laneDestination", v)}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.unit}
+                      onChange={(v) => update(idx, "unit", v)}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.rate}
+                      flagged={row.rate === null}
+                      onChange={(v) =>
+                        update(idx, "rate", v === "" ? null : Number(v))
+                      }
+                      type="number"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.currency}
+                      flagged={row.currency === null}
+                      onChange={(v) =>
+                        update(
+                          idx,
+                          "currency",
+                          (v || null) as ExtractedRateRow["currency"],
+                        )
+                      }
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.validFrom}
+                      onChange={(v) => update(idx, "validFrom", v || null)}
+                      type="date"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Cell
+                      value={row.validTo}
+                      onChange={(v) => update(idx, "validTo", v || null)}
+                      type="date"
+                    />
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    {row.issues.length > 0 ? (
+                      <ul className="space-y-1">
+                        {row.issues.map((issue) => (
+                          <li
+                            key={issue}
+                            className="flex items-start gap-1 text-xs text-amber-800"
+                          >
+                            <span className="mt-0.5 shrink-0">⚠</span>
+                            <span>{issue}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-xs text-emerald-600">✓</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Source text (collapsed) */}
+      <details className="mt-4">
+        <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600">
+          Show raw source text per row
+        </summary>
+        <div className="mt-2 space-y-1">
+          {rows.map((r, i) => (
+            <div key={r.id} className="rounded bg-slate-100 px-3 py-1.5 font-mono text-xs text-slate-600">
+              <span className="text-slate-400">#{i + 1}:</span> {r.source}
+            </div>
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/* ── Editable Cell ─────────────────────────────────────────────── */
+
+function Cell({
+  value,
+  flagged,
+  onChange,
+  type = "text",
+}: {
+  value: string | number | null;
+  flagged?: boolean;
+  onChange: (value: string) => void;
+  type?: "text" | "number" | "date";
+}) {
+  return (
+    <input
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+      type={type}
+      placeholder={flagged ? "—" : ""}
+      className={cn(
+        "w-full rounded border bg-white px-2 py-1 text-sm outline-none transition-colors focus:ring-2 focus:ring-slate-400",
+        flagged
+          ? "border-amber-400 bg-amber-50"
+          : "border-slate-200 hover:border-slate-300",
+      )}
+    />
+  );
+}
+
+/* ── Spinner ───────────────────────────────────────────────────── */
+
+function Spinner() {
+  return (
+    <svg
+      className="h-4 w-4 animate-spin"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx={12}
+        cy={12}
+        r={10}
+        stroke="currentColor"
+        strokeWidth={4}
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
+}
+
+/* ── Page Skeleton ─────────────────────────────────────────────── */
+
+function PageSkeleton() {
+  return (
+    <div className="mx-auto max-w-6xl space-y-4">
+      <div className="h-6 w-40 animate-pulse rounded bg-slate-200" />
+      <div className="h-8 w-64 animate-pulse rounded bg-slate-200" />
+      <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
+    </div>
+  );
+}

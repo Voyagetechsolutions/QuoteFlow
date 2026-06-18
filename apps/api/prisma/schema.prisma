@@ -1,0 +1,173 @@
+// QuoteFlow data model.
+// Multi-tenant from day one: every business row hangs off a Company (companyId).
+// RateRow mirrors the extraction spike's canonical schema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users     User[]
+  customers Customer[]
+  rateSets  RateSet[]
+  quotes    Quote[]
+  invoices  Invoice[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(STAFF)
+  createdAt    DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  contact   String?
+  createdAt DateTime @default(now())
+
+  quotes   Quote[]
+  invoices Invoice[]
+
+  @@index([companyId])
+}
+
+/// A reusable set of rates extracted from one uploaded rate sheet.
+model RateSet {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  sourceFilename String?
+  extractor      String? // "table/xlsx", "vision/claude-sonnet-4-6", ...
+  validFrom      DateTime?
+  validTo        DateTime?
+  createdAt      DateTime @default(now())
+
+  rows RateRow[]
+
+  @@index([companyId])
+}
+
+/// One extracted rate line. needsReview/issues drive the editable review table.
+model RateRow {
+  id              String   @id @default(cuid())
+  rateSetId       String
+  rateSet         RateSet  @relation(fields: [rateSetId], references: [id], onDelete: Cascade)
+  chargeType      String?
+  laneOrigin      String?
+  laneDestination String?
+  unit            String?
+  rate            Decimal? @db.Decimal(14, 2)
+  currency        String?
+  validFrom       DateTime?
+  validTo         DateTime?
+  remark          String?
+  needsReview     Boolean  @default(false)
+  issues          String[]
+  source          String? // raw cell text for the review table
+  createdAt       DateTime @default(now())
+
+  @@index([rateSetId])
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  companyId       String
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId      String
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  number          String
+  status          QuoteStatus @default(DRAFT)
+  currency        String      @default("USD")
+  defaultMarginPct Decimal    @default(0) @db.Decimal(6, 2)
+  createdAt       DateTime    @default(now())
+
+  lines   QuoteLine[]
+  invoice Invoice?
+
+  @@unique([companyId, number])
+  @@index([companyId])
+}
+
+model QuoteLine {
+  id          String  @id @default(cuid())
+  quoteId     String
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  chargeType  String?
+  unit        String?
+  costRate    Decimal @db.Decimal(14, 2)
+  sellRate    Decimal @db.Decimal(14, 2)
+  marginPct   Decimal @db.Decimal(6, 2)
+  currency    String
+
+  @@index([quoteId])
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  companyId  String
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quoteId    String?       @unique
+  quote      Quote?        @relation(fields: [quoteId], references: [id])
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  number     String
+  status     InvoiceStatus @default(DRAFT)
+  dueDate    DateTime?
+  createdAt  DateTime      @default(now())
+
+  lines InvoiceLine[]
+
+  @@unique([companyId, number])
+  @@index([companyId])
+}
+
+model InvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  amount      Decimal @db.Decimal(14, 2)
+  currency    String
+
+  @@index([invoiceId])
+}

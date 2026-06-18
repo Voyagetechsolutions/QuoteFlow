@@ -1,0 +1,19 @@
+{
+  "name": "quoteflow",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Messy freight rate sheet -> branded quote -> one-click invoice",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:api": "npm run dev --workspace @quoteflow/api",
+    "dev:web": "npm run dev --workspace @quoteflow/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
