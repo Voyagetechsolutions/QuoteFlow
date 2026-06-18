@@ -7,14 +7,16 @@
  *   DATABASE_URL="postgresql://postgres:postgres@localhost:5433/quoteflow?schema=public"
  */
 const path = require('node:path');
+const fs = require('node:fs');
 const mod = require('embedded-postgres');
 const EmbeddedPostgres = mod.default ?? mod;
 
 const PORT = Number(process.env.PGPORT ?? 5433);
+const DATA_DIR = path.join(__dirname, '..', '.pgdata');
 
 (async () => {
   const pg = new EmbeddedPostgres({
-    databaseDir: path.join(__dirname, '..', '.pgdata'),
+    databaseDir: DATA_DIR,
     user: 'postgres',
     password: 'postgres',
     port: PORT,
@@ -24,7 +26,12 @@ const PORT = Number(process.env.PGPORT ?? 5433);
     initdbFlags: ['--encoding=UTF8', '--no-locale'],
   });
 
-  await pg.initialise();
+  // Idempotent: only initdb when there's no existing cluster. Lets the DB be
+  // restarted (e.g. after a hard kill that skipped graceful cleanup) without
+  // tripping "directory exists but is not empty".
+  if (!fs.existsSync(path.join(DATA_DIR, 'PG_VERSION'))) {
+    await pg.initialise();
+  }
   await pg.start();
   try {
     await pg.createDatabase('quoteflow');

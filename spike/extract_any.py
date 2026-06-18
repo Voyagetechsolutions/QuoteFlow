@@ -23,6 +23,7 @@ import sys
 from dataclasses import asdict
 
 from extract import extract_xlsx, extract_csv, extract_pdf, RateRow
+from normalize import normalize_rows
 
 # snake_case (Python dataclass) -> camelCase (shared TS contract)
 _CAMEL = {
@@ -31,6 +32,8 @@ _CAMEL = {
     "lane_destination": "laneDestination",
     "valid_from": "validFrom",
     "valid_to": "validTo",
+    "charge_code": "chargeCode",
+    "charge_label": "chargeLabel",
     "needs_review": "needsReview",
 }
 
@@ -64,10 +67,14 @@ def main() -> None:
     ap.add_argument("path")
     ap.add_argument("--name", help="original filename to report as sourceFile")
     ap.add_argument("--model", help="override vision model")
+    ap.add_argument("--default-currency", help="company fallback currency")
     ap.add_argument("--pretty", action="store_true")
     args = ap.parse_args()
 
     extractor, rows = run(args.path, args.model)
+    # Deterministic freight normalization post-pass (the moat) — applies to
+    # every extractor's output and owns the money-critical flags.
+    normalize_rows(rows, args.default_currency)
     payload = {
         "sourceFile": args.name or os.path.basename(args.path),
         "extractor": extractor,

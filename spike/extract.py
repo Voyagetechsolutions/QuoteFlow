@@ -68,6 +68,11 @@ class RateRow:
     valid_from: Optional[str] = None
     valid_to: Optional[str] = None
     remark: Optional[str] = None
+    # filled by the normalization post-pass (spike/normalize.py)
+    charge_code: Optional[str] = None
+    charge_label: Optional[str] = None
+    basis: Optional[str] = None
+    confidence: float = 1.0
     needs_review: bool = False
     issues: list[str] = field(default_factory=list)
     source: str = ""  # raw cell text, for the review table

@@ -26,6 +26,18 @@ export const CHARGE_TYPES = [
 ] as const;
 export type ChargeType = (typeof CHARGE_TYPES)[number] | string;
 
+/** Canonical basis enum — how a rate is charged. */
+export const BASES = [
+  "per_container_20",
+  "per_container_40",
+  "per_cbm",
+  "per_kg",
+  "per_shipment",
+  "per_bl",
+  "flat",
+] as const;
+export type Basis = (typeof BASES)[number];
+
 /**
  * One row as it comes OUT of extraction, before the user has reviewed it.
  * `needsReview` + `issues` drive the review table: flagged rows surface first.
@@ -41,6 +53,11 @@ export interface ExtractedRateRow {
   validFrom: string | null; // ISO date
   validTo: string | null; // ISO date
   remark: string | null;
+  // --- normalization layer (deterministic post-pass) ---
+  chargeCode: string | null; // canonical: THC, BAF, FREIGHT, ...
+  chargeLabel: string | null; // raw label as it appeared on the sheet
+  basis: Basis | null; // canonical basis enum
+  confidence: number; // 0..1, lowered for missing money-critical fields
   needsReview: boolean;
   issues: string[];
   source: string; // raw cell text, shown in the review table for context

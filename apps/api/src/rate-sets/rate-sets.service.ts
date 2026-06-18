@@ -9,20 +9,26 @@ export interface CreateRateSetDto {
   extractor?: string;
   validFrom?: string; // ISO date
   validTo?: string;   // ISO date
-  rows: {
-    chargeType?: string | null;
-    laneOrigin?: string | null;
-    laneDestination?: string | null;
-    unit?: string | null;
-    rate?: number | null;
-    currency?: string | null;
-    validFrom?: string | null;
-    validTo?: string | null;
-    remark?: string | null;
-    needsReview?: boolean;
-    issues?: string[];
-    source?: string | null;
-  }[];
+  rows: RateRowInput[];
+}
+
+export interface RateRowInput {
+  chargeType?: string | null;
+  laneOrigin?: string | null;
+  laneDestination?: string | null;
+  unit?: string | null;
+  rate?: number | null;
+  currency?: string | null;
+  validFrom?: string | null;
+  validTo?: string | null;
+  remark?: string | null;
+  chargeCode?: string | null;
+  chargeLabel?: string | null;
+  basis?: string | null;
+  confidence?: number;
+  needsReview?: boolean;
+  issues?: string[];
+  source?: string | null;
 }
 
 /** Shape accepted when patching a single RateRow. */
@@ -36,6 +42,10 @@ export interface UpdateRateRowDto {
   validFrom?: string | null;
   validTo?: string | null;
   remark?: string | null;
+  chargeCode?: string | null;
+  chargeLabel?: string | null;
+  basis?: string | null;
+  confidence?: number;
   needsReview?: boolean;
   issues?: string[];
   source?: string | null;
@@ -92,6 +102,10 @@ export class RateSetsService {
             validFrom: r.validFrom ? new Date(r.validFrom) : null,
             validTo: r.validTo ? new Date(r.validTo) : null,
             remark: r.remark ?? null,
+            chargeCode: r.chargeCode ?? null,
+            chargeLabel: r.chargeLabel ?? null,
+            basis: r.basis ?? null,
+            confidence: r.confidence ?? 1,
             needsReview: r.needsReview ?? false,
             issues: r.issues ?? [],
             source: r.source ?? null,
@@ -178,6 +192,10 @@ export class RateSetsService {
     if (data.validTo !== undefined)
       updateData.validTo = data.validTo ? new Date(data.validTo) : null;
     if (data.remark !== undefined) updateData.remark = data.remark;
+    if (data.chargeCode !== undefined) updateData.chargeCode = data.chargeCode;
+    if (data.chargeLabel !== undefined) updateData.chargeLabel = data.chargeLabel;
+    if (data.basis !== undefined) updateData.basis = data.basis;
+    if (data.confidence !== undefined) updateData.confidence = data.confidence;
     if (data.needsReview !== undefined) updateData.needsReview = data.needsReview;
     if (data.issues !== undefined) updateData.issues = data.issues;
     if (data.source !== undefined) updateData.source = data.source;

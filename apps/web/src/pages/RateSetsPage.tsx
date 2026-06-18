@@ -250,12 +250,13 @@ function ReviewModal({
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-3 py-2">Charge</th>
+              <th className="px-3 py-2">Code</th>
               <th className="px-3 py-2">Origin</th>
               <th className="px-3 py-2">Destination</th>
-              <th className="px-3 py-2">Unit</th>
+              <th className="px-3 py-2">Basis</th>
               <th className="px-3 py-2 text-right">Rate</th>
               <th className="px-3 py-2">Ccy</th>
+              <th className="px-3 py-2 text-right">Conf</th>
               <th className="px-3 py-2">Review</th>
             </tr>
           </thead>
@@ -271,14 +272,38 @@ function ReviewModal({
                       : "border-t border-slate-100"
                   }
                 >
-                  <td className="px-3 py-2">{row.chargeType ?? "—"}</td>
+                  <td className="px-3 py-2 font-medium">
+                    {row.chargeCode ?? row.chargeType ?? "—"}
+                  </td>
                   <td className="px-3 py-2">{row.laneOrigin ?? "—"}</td>
                   <td className="px-3 py-2">{row.laneDestination ?? "—"}</td>
-                  <td className="px-3 py-2">{row.unit ?? "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td
+                    className={
+                      "px-3 py-2 " +
+                      (row.basis === null ? "bg-amber-100 font-medium text-amber-900" : "")
+                    }
+                  >
+                    {row.basis ?? "—"}
+                  </td>
+                  <td
+                    className={
+                      "px-3 py-2 text-right tabular-nums " +
+                      (row.rate === null ? "bg-amber-100 font-medium text-amber-900" : "")
+                    }
+                  >
                     {row.rate ?? "—"}
                   </td>
-                  <td className="px-3 py-2">{row.currency ?? "—"}</td>
+                  <td
+                    className={
+                      "px-3 py-2 " +
+                      (row.currency === null ? "bg-amber-100 font-medium text-amber-900" : "")
+                    }
+                  >
+                    {row.currency ?? "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-xs text-slate-500">
+                    {Math.round(row.confidence * 100)}%
+                  </td>
                   <td className="px-3 py-2 text-xs">
                     {row.issues.length > 0 ? (
                       <span className="text-amber-800">

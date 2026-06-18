@@ -170,12 +170,13 @@ function ReviewTable({
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
               <th className="px-3 py-3 w-8">#</th>
-              <th className="px-3 py-3">Charge Type</th>
+              <th className="px-3 py-3">Code</th>
               <th className="px-3 py-3">Origin</th>
               <th className="px-3 py-3">Destination</th>
-              <th className="px-3 py-3">Unit</th>
+              <th className="px-3 py-3">Basis</th>
               <th className="px-3 py-3">Rate</th>
               <th className="px-3 py-3">Ccy</th>
+              <th className="px-3 py-3">Conf</th>
               <th className="px-3 py-3">Valid From</th>
               <th className="px-3 py-3">Valid To</th>
               <th className="px-3 py-3">Issues</th>
@@ -198,8 +199,8 @@ function ReviewTable({
                   <td className="px-3 py-2 text-xs text-slate-400">{idx + 1}</td>
                   <td className="px-3 py-2">
                     <Cell
-                      value={row.chargeType}
-                      onChange={(v) => update(idx, "chargeType", v)}
+                      value={row.chargeCode}
+                      onChange={(v) => update(idx, "chargeCode", v || null)}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -217,8 +218,15 @@ function ReviewTable({
                   </td>
                   <td className="px-3 py-2">
                     <Cell
-                      value={row.unit}
-                      onChange={(v) => update(idx, "unit", v)}
+                      value={row.basis}
+                      flagged={row.basis === null}
+                      onChange={(v) =>
+                        update(
+                          idx,
+                          "basis",
+                          (v || null) as ExtractedRateRow["basis"],
+                        )
+                      }
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -243,6 +251,9 @@ function ReviewTable({
                         )
                       }
                     />
+                  </td>
+                  <td className="px-3 py-2 text-xs tabular-nums text-slate-500">
+                    {Math.round(row.confidence * 100)}%
                   </td>
                   <td className="px-3 py-2">
                     <Cell
