@@ -246,16 +246,13 @@ def validate_row(row: RateRow, raw_rate_text: Optional[str] = None) -> RateRow:
 
 # --- Excel path --------------------------------------------------------------
 
-def extract_xlsx(path: str) -> list[RateRow]:
-    wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb.active
+def _extract_from_grid(grid: list[list[str]]) -> list[RateRow]:
+    """Core row-by-row parse, shared by the Excel and CSV paths."""
     rows: list[RateRow] = []
     ctx: dict = {}
     colmap: dict[str, int] = {}
 
-    for raw in ws.iter_rows(values_only=True):
-        cells = ["" if c is None else str(c) for c in raw]
-
+    for cells in grid:
         vf, vt = parse_validity(" ".join(cells))
         if vf or vt:
             ctx["valid_from"], ctx["valid_to"] = vf, vt
@@ -276,6 +273,24 @@ def extract_xlsx(path: str) -> list[RateRow]:
         if row:
             rows.append(row)
     return rows
+
+
+def extract_xlsx(path: str) -> list[RateRow]:
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb.active
+    grid = [
+        ["" if c is None else str(c) for c in raw]
+        for raw in ws.iter_rows(values_only=True)
+    ]
+    return _extract_from_grid(grid)
+
+
+def extract_csv(path: str) -> list[RateRow]:
+    import csv
+
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        grid = [[(c or "").strip() for c in row] for row in csv.reader(fh)]
+    return _extract_from_grid(grid)
 
 
 # --- PDF path ----------------------------------------------------------------
@@ -363,6 +378,8 @@ def extract(path: str) -> list[RateRow]:
     lower = path.lower()
     if lower.endswith((".xlsx", ".xlsm", ".xls")):
         return extract_xlsx(path)
+    if lower.endswith(".csv"):
+        return extract_csv(path)
     if lower.endswith(".pdf"):
         return extract_pdf(path)
     raise SystemExit(f"unsupported file type: {path}")

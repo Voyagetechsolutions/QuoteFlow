@@ -6,15 +6,37 @@ import {
   Delete,
   Param,
   Body,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { RateSetsService, CreateRateSetDto, UpdateRateRowDto } from './rate-sets.service';
+import { ExtractionService, UploadedRateSheet } from './extraction.service';
 
 // TODO: companyId will come from auth JWT once auth is implemented
 const DEMO_COMPANY_ID = 'demo-company-001';
 
 @Controller('rate-sets')
 export class RateSetsController {
-  constructor(private readonly rateSetsService: RateSetsService) {}
+  constructor(
+    private readonly rateSetsService: RateSetsService,
+    private readonly extractionService: ExtractionService,
+  ) {}
+
+  /**
+   * Stateless extraction: upload a rate sheet, get back the extracted rows for
+   * review. Nothing is persisted here — the user reviews/edits, then POST /
+   * to save (PRD Flow A: review before save). Needs no database.
+   */
+  @Post('extract')
+  @UseInterceptors(FileInterceptor('file'))
+  extract(@UploadedFile() file?: UploadedRateSheet) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded (form field "file").');
+    }
+    return this.extractionService.extract(file);
+  }
 
   @Post()
   create(@Body() body: CreateRateSetDto) {

@@ -5,6 +5,7 @@
 
 import type {
   ExtractedRateRow,
+  ExtractionResult,
   QuoteStatus,
   InvoiceStatus,
 } from "@quoteflow/shared";
@@ -59,13 +60,32 @@ export function getRateSet(id: string): Promise<RateSetDetail> {
   return request<RateSetDetail>(`/api/rate-sets/${id}`);
 }
 
-export function uploadRateSet(file: File): Promise<RateSet> {
+/**
+ * Stateless extraction — upload a sheet, get rows back for review (not saved).
+ * Maps to POST /api/rate-sets/extract.
+ */
+export function extractRateSheet(file: File): Promise<ExtractionResult> {
   const body = new FormData();
   body.append("file", file);
-  return request<RateSet>("/api/rate-sets/upload", {
+  return request<ExtractionResult>("/api/rate-sets/extract", {
     method: "POST",
-    headers: {}, // let browser set multipart boundary
+    headers: {}, // let the browser set the multipart boundary
     body,
+  });
+}
+
+/** Persist a reviewed extraction as a reusable rate set (POST /api/rate-sets). */
+export function saveRateSet(data: {
+  name: string;
+  sourceFilename?: string;
+  extractor?: string;
+  validFrom?: string | null;
+  validTo?: string | null;
+  rows: ExtractedRateRow[];
+}): Promise<RateSet> {
+  return request<RateSet>("/api/rate-sets", {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }
 
