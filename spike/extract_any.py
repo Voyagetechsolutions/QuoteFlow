@@ -42,22 +42,25 @@ def _to_camel(d: dict) -> dict:
     return {_CAMEL.get(k, k): v for k, v in d.items()}
 
 
-def run(path: str, model: str | None = None) -> tuple[str, list[RateRow]]:
+def run(path: str, model: str | None = None,
+        force_vision: bool = False) -> tuple[str, list[RateRow]]:
     lower = path.lower()
     if lower.endswith((".xlsx", ".xlsm", ".xls")):
         return "table/xlsx", extract_xlsx(path)
     if lower.endswith(".csv"):
         return "table/csv", extract_csv(path)
     if lower.endswith(".pdf"):
-        rows = extract_pdf(path)
+        rows = [] if force_vision else extract_pdf(path)
         if rows:
             return "table/pdf", rows
-        # No extractable tables — likely a scan. Try vision if we have a key.
+        # No extractable tables (or forced) — use vision if we have a key.
         if os.environ.get("ANTHROPIC_API_KEY"):
             from vision_extract import extract_vision, DEFAULT_MODEL
 
             chosen = model or DEFAULT_MODEL
             return f"vision/{chosen}", extract_vision(path, chosen, dry_run=False)
+        if force_vision:
+            raise SystemExit("--force-vision needs ANTHROPIC_API_KEY")
         return "table/pdf", rows  # empty; caller sees rowCount 0
     raise SystemExit(f"unsupported file type: {path}")
 
@@ -68,10 +71,12 @@ def main() -> None:
     ap.add_argument("--name", help="original filename to report as sourceFile")
     ap.add_argument("--model", help="override vision model")
     ap.add_argument("--default-currency", help="company fallback currency")
+    ap.add_argument("--force-vision", action="store_true",
+                    help="skip table parsing; use the vision tier (needs a key)")
     ap.add_argument("--pretty", action="store_true")
     args = ap.parse_args()
 
-    extractor, rows = run(args.path, args.model)
+    extractor, rows = run(args.path, args.model, args.force_vision)
     # Deterministic freight normalization post-pass (the moat) — applies to
     # every extractor's output and owns the money-critical flags.
     normalize_rows(rows, args.default_currency)

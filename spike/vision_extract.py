@@ -63,11 +63,24 @@ Return ONLY a JSON object, no prose, with this exact shape:
   ]
 }
 
+Freight glossary (to read labels correctly — a deterministic post-pass will
+canonicalise codes/units afterwards, so transcribe faithfully, don't invent):
+- Charge labels you may see: FREIGHT / ocean / sea freight; THC (terminal
+  handling); BAF (bunker); CAF (currency adj.); ISPS / security; DOC /
+  documentation / B/L fee; clearing / customs clearance; wharfage; demurrage.
+- Container/basis terms: 20'GP, 20DC, 20ft → a 20ft container; 40'GP, 40HC,
+  40DC → a 40ft container; per CBM / W/M (cubic); per kg / per ton; per BL;
+  per shipment / per consignment; lumpsum / flat.
+- Lane headers: POL = port of loading (origin), POD = port of discharge
+  (destination); codes like ZADUR/ZWHRE are UN/LOCODEs.
+
 Rules:
-- Derive charge_type from the section heading the row sits under.
+- Derive charge_type from the section heading the row sits under; put the row's
+  own raw charge wording in "remark" if it differs.
 - Local charges legitimately have no destination; leave it null.
 - Parse messy rate formats ("USD 1,850.00", "$3,400", "4 050") into a plain number.
-- If a value is genuinely illegible or absent, use null. Do NOT guess.
+- NEVER guess a rate, currency, or basis/unit. If illegible or absent, use null.
+  A wrong number becomes a wrong quote — a null that flags for review is correct.
 - The validity dates usually appear once as free text; apply them to every row.
 """
 
