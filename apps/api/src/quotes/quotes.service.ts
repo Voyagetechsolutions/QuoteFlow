@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -21,6 +25,44 @@ export interface CreateQuoteDto {
   currency?: string;
   defaultMarginPct?: number;
   lines: CreateQuoteLineDto[];
+}
+
+export interface CreateQuoteFromRateSetDto {
+  rateSetId: string;
+  customerId: string;
+  marginPct?: number;
+  /** Rate-row ids to include; omitted = all priced rows. */
+  rowIds?: string[];
+}
+
+const BASIS_LABEL: Record<string, string> = {
+  per_container_20: '20ft',
+  per_container_40: '40ft',
+  per_truck: 'per truck',
+  per_cbm: 'per CBM',
+  per_kg: 'per kg',
+  per_shipment: 'per shipment',
+  per_bl: 'per B/L',
+  flat: 'flat',
+};
+
+/** Human-readable quote-line description from a rate row. */
+function describeRateRow(r: {
+  chargeCode: string | null;
+  chargeType: string | null;
+  laneOrigin: string | null;
+  laneDestination: string | null;
+  basis: string | null;
+}): string {
+  const what = r.chargeCode ?? r.chargeType ?? 'Charge';
+  const lane =
+    r.laneOrigin && r.laneDestination
+      ? ` ${r.laneOrigin}→${r.laneDestination}`
+      : r.laneOrigin
+        ? ` ${r.laneOrigin}`
+        : '';
+  const basis = r.basis ? ` (${BASIS_LABEL[r.basis] ?? r.basis})` : '';
+  return `${what}${lane}${basis}`;
 }
 
 export interface UpdateQuoteDto {
@@ -153,6 +195,59 @@ export class QuotesService {
     });
 
     return this.serialiseQuote(quote);
+  }
+
+  /**
+   * One-click automation: turn selected rate-set rows into a priced DRAFT
+   * quote. Cost comes from each rate row; sell = cost * (1 + margin%). Rows
+   * with no parseable rate are skipped (they'd need manual pricing).
+   */
+  async createFromRateSet(companyId: string, data: CreateQuoteFromRateSetDto) {
+    const rateSet = await this.prisma.rateSet.findFirst({
+      where: { id: data.rateSetId, companyId },
+      include: { rows: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!rateSet) {
+      throw new NotFoundException(`RateSet ${data.rateSetId} not found`);
+    }
+
+    const margin = data.marginPct ?? 0;
+    const selected = rateSet.rows.filter(
+      (r) =>
+        (!data.rowIds || data.rowIds.includes(r.id)) && r.rate !== null,
+    );
+    if (selected.length === 0) {
+      throw new BadRequestException(
+        'No priced rows selected (rows without a rate need manual pricing).',
+      );
+    }
+
+    const lines: CreateQuoteLineDto[] = selected.map((r) => {
+      const cost = this.toNum(r.rate);
+      const sell = Math.round(cost * (1 + margin / 100) * 100) / 100;
+      return {
+        description: describeRateRow(r),
+        chargeType: r.chargeType ?? undefined,
+        unit: r.basis ?? r.unit ?? undefined,
+        costRate: cost,
+        sellRate: sell,
+        marginPct: margin,
+        currency: r.currency ?? 'USD',
+      };
+    });
+
+    // Header currency = the most common line currency (mixed currencies are
+    // kept per-line; a proper FX engine is deferred per the PRD).
+    const counts = new Map<string, number>();
+    for (const l of lines) counts.set(l.currency, (counts.get(l.currency) ?? 0) + 1);
+    const currency = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+    return this.create(companyId, {
+      customerId: data.customerId,
+      currency,
+      defaultMarginPct: margin,
+      lines,
+    });
   }
 
   /** List quotes for a company with customer name, line count, and total. */

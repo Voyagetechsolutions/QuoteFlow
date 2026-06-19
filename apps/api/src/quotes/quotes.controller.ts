@@ -13,6 +13,7 @@ import type { Response } from 'express';
 import {
   QuotesService,
   CreateQuoteDto,
+  CreateQuoteFromRateSetDto,
   UpdateQuoteDto,
   CreateQuoteLineDto,
   UpdateQuoteLineDto,
@@ -62,6 +63,15 @@ export class QuotesController {
   @Post()
   create(@CompanyId() companyId: string, @Body() body: CreateQuoteDto) {
     return this.quotesService.create(companyId, body);
+  }
+
+  /** One-click: generate a priced draft quote from a saved rate set. */
+  @Post('from-rate-set')
+  createFromRateSet(
+    @CompanyId() companyId: string,
+    @Body() body: CreateQuoteFromRateSetDto,
+  ) {
+    return this.quotesService.createFromRateSet(companyId, body);
   }
 
   /** Branded customer-facing PDF (sell prices only — no cost/margin). */

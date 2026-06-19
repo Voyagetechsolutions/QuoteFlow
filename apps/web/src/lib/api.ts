@@ -270,6 +270,19 @@ export function createQuote(
   });
 }
 
+/** One-click: generate a priced draft quote from a saved rate set. */
+export function createQuoteFromRateSet(data: {
+  rateSetId: string;
+  customerId: string;
+  marginPct: number;
+  rowIds?: string[];
+}): Promise<Quote> {
+  return request<Quote>("/api/quotes/from-rate-set", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export function updateQuote(
   id: string,
   data: Partial<Quote>,

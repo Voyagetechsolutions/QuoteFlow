@@ -1,7 +1,15 @@
-import { useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import type { ExtractedRateRow } from "@quoteflow/shared";
-import { getRateSet, updateRateRow, type RateSetDetail } from "../lib/api";
+import {
+  getRateSet,
+  updateRateRow,
+  getCustomers,
+  createQuoteFromRateSet,
+  type RateSetDetail,
+  type Customer,
+} from "../lib/api";
 import { useAsync, cn, type NavigateFn } from "../lib/hooks";
+import { Modal } from "../components/Modal";
 
 interface Props {
   rateSetId: string;
@@ -68,6 +76,9 @@ function ReviewTable({
   const [rows, setRows] = useState<RowWithId[]>(rateSet.rows);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const pricedCount = rows.filter((r) => r.rate !== null).length;
 
   // Sort: flagged rows first
   const ordered = useMemo(
@@ -149,20 +160,49 @@ function ReviewTable({
             </span>
           )}
         </div>
-        <button
-          onClick={handleSave}
-          disabled={dirtyIds.size === 0 || saving}
-          className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {saving ? (
-            <>
-              <Spinner /> Saving…
-            </>
-          ) : (
-            "Save Changes"
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setGenerating(true)}
+            disabled={pricedCount === 0}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+            title={
+              dirtyIds.size > 0
+                ? "Tip: save your edits first so the quote uses them"
+                : "Generate a priced draft quote from these rates"
+            }
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            Generate quote
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={dirtyIds.size === 0 || saving}
+            className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {saving ? (
+              <>
+                <Spinner /> Saving…
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </button>
+        </div>
       </div>
+
+      {generating && (
+        <GenerateQuoteModal
+          rateSetId={rateSet.id}
+          pricedCount={pricedCount}
+          skippedCount={rows.length - pricedCount}
+          onClose={() => setGenerating(false)}
+          onGenerated={(quoteId) =>
+            navigate({ name: "quote-detail", id: quoteId })
+          }
+        />
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -374,5 +414,121 @@ function PageSkeleton() {
       <div className="h-8 w-64 animate-pulse rounded bg-slate-200" />
       <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
     </div>
+  );
+}
+
+/* ── Generate Quote Modal ──────────────────────────────────────── */
+
+function GenerateQuoteModal({
+  rateSetId,
+  pricedCount,
+  skippedCount,
+  onClose,
+  onGenerated,
+}: {
+  rateSetId: string;
+  pricedCount: number;
+  skippedCount: number;
+  onClose: () => void;
+  onGenerated: (quoteId: string) => void;
+}) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerId, setCustomerId] = useState("");
+  const [margin, setMargin] = useState(15);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getCustomers()
+      .then((cs) => {
+        setCustomers(cs);
+        if (cs[0]) setCustomerId(cs[0].id);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  async function generate() {
+    if (!customerId) return;
+    setBusy(true);
+    try {
+      const quote = await createQuoteFromRateSet({
+        rateSetId,
+        customerId,
+        marginPct: margin,
+      });
+      onGenerated(quote.id);
+    } catch {
+      alert("Could not generate the quote. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open title="Generate quote from rates" onClose={onClose}>
+      <p className="mb-4 text-sm text-slate-600">
+        Creates a priced draft quote from{" "}
+        <span className="font-semibold">{pricedCount}</span> priced rate
+        {pricedCount === 1 ? "" : "s"}
+        {skippedCount > 0 && (
+          <> ({skippedCount} without a rate will be skipped)</>
+        )}
+        . You can edit and approve it next.
+      </p>
+
+      <label className="mb-3 block">
+        <span className="mb-1 block text-xs font-medium text-slate-500">
+          Customer
+        </span>
+        {customers.length === 0 ? (
+          <span className="text-sm text-amber-700">
+            No customers yet — add one under Customers first.
+          </span>
+        ) : (
+          <select
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+          >
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </label>
+
+      <label className="mb-4 block">
+        <span className="mb-1 block text-xs font-medium text-slate-500">
+          Default margin %
+        </span>
+        <input
+          type="number"
+          value={margin}
+          min={0}
+          step={0.5}
+          onChange={(e) => setMargin(Number(e.target.value))}
+          className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+        />
+        <span className="ml-2 text-xs text-slate-500">
+          applied to every line (editable after)
+        </span>
+      </label>
+
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={onClose}
+          className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={generate}
+          disabled={busy || !customerId}
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {busy ? "Generating…" : "Generate draft quote"}
+        </button>
+      </div>
+    </Modal>
   );
 }
