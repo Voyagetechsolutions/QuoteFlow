@@ -30,17 +30,38 @@ from typing import Optional
 import openpyxl
 import pdfplumber
 
+from normalize import normalize_basis
+
 # --- canonical schema --------------------------------------------------------
 
 CHARGE_TYPE_BY_SECTION = {
     "SEA FREIGHT": "Ocean Freight",
+    "OCEAN FREIGHT": "Ocean Freight",
     "ROAD FREIGHT": "Road Freight",
     "AIR FREIGHT": "Air Freight",
     "LOCAL CHARGES": "Local Charge",
+    "LOCAL CHARGE": "Local Charge",
 }
 
 HEADER_TOKENS = {"origin", "destination", "dest", "unit", "rate", "currency",
-                 "ccy", "remarks", "remark", "lane", "charge", "amount"}
+                 "ccy", "remarks", "remark", "lane", "charge", "amount",
+                 "pol", "pod", "basis", "transit", "description", "price",
+                 "from", "to", "service", "tariff"}
+
+
+def container_basis(header: Optional[str]) -> Optional[str]:
+    """A container-size column header (20'GP, 40HC, 20ft, ...) -> basis enum.
+
+    Real FCL rate sheets put the rate in per-container-size columns rather than
+    a single 'rate' column, so each such column is its own rate with a known
+    basis. Returns None for non-container headers.
+    """
+    h = re.sub(r"[^a-z0-9]", "", (header or "").lower())
+    if re.fullmatch(r"20(gp|dc|hc|hq|ft|rf|reefer)?", h):
+        return "per_container_20"
+    if re.fullmatch(r"40(gp|dc|hc|hq|ft|rf|reefer)?", h):
+        return "per_container_40"
+    return None
 
 CURRENCY_SYMBOL = {"$": "USD", "R": "ZAR", "€": "EUR", "£": "GBP"}
 KNOWN_CURRENCIES = {"USD", "ZAR", "EUR", "GBP", "ZWL", "BWP", "ZMW", "MWK"}
@@ -119,6 +140,10 @@ def parse_rate(text: str) -> tuple[Optional[float], Optional[str]]:
     s = str(text).strip()
     if not s:
         return None, None
+    # Non-numeric placeholders — don't fabricate a rate from "see note 2",
+    # "on application", "POA", "TBD", etc. A flagged blank beats a wrong number.
+    if re.search(r"(?i)\b(see|note|application|request|poa|tba|tbd|n/?a|nil)\b", s):
+        return None, None
     m = RATE_RE.search(s)
     if not m:
         return None, None
@@ -150,6 +175,7 @@ def is_header_row(cells: list[str]) -> bool:
     if not toks:
         return False
     hits = sum(1 for t in toks if t in HEADER_TOKENS)
+    hits += sum(1 for c in cells if container_basis(c))
     return hits >= 2
 
 
@@ -173,63 +199,92 @@ def is_section_row(cells: list[str]) -> Optional[str]:
 
 # --- column mapping ----------------------------------------------------------
 
-def build_colmap(header_cells: list[str]) -> dict[str, int]:
-    """Map canonical field -> column index from a detected header row."""
-    colmap: dict[str, int] = {}
+def build_colmap(header_cells: list[str]) -> dict:
+    """Classify header columns. Returns field indices plus `rate_cols`: a list
+    of (index, basis) where basis is a container enum for size columns or None
+    for a generic 'rate'/'amount' column."""
+    cm: dict = {"rate_cols": []}
     for idx, cell in enumerate(header_cells):
         t = (cell or "").strip().lower()
-        if t in ("origin", "from"):
-            colmap["lane_origin"] = idx
-        elif t in ("destination", "dest", "to"):
-            colmap["lane_destination"] = idx
-        elif t == "unit":
-            colmap["unit"] = idx
-        elif t in ("rate", "amount"):
-            colmap["rate"] = idx
-        elif t in ("currency", "ccy"):
-            colmap["currency"] = idx
-        elif t in ("remarks", "remark"):
-            colmap["remark"] = idx
-    return colmap
+        cb = container_basis(cell)
+        if cb:
+            cm["rate_cols"].append((idx, cb))
+        elif t in ("origin", "from", "pol", "port of loading", "loading port"):
+            cm["origin"] = idx
+        elif t in ("destination", "dest", "to", "pod",
+                   "port of discharge", "discharge port"):
+            cm["destination"] = idx
+        elif t in ("charge", "charge type", "description", "item", "service"):
+            cm["charge"] = idx
+        elif t in ("basis", "unit", "per"):
+            cm["basis"] = idx
+        elif t in ("rate", "amount", "price", "tariff"):
+            cm["rate_cols"].append((idx, None))
+        elif t in ("currency", "ccy", "cur"):
+            cm["currency"] = idx
+        elif t in ("remarks", "remark", "notes", "note", "transit"):
+            cm["remark"] = idx
+    return cm
 
 
-def row_from_cells(cells: list[str], colmap: dict[str, int],
-                   ctx: dict) -> Optional[RateRow]:
-    def get(field_name: str) -> Optional[str]:
-        i = colmap.get(field_name)
+def rows_from_cells(cells: list[str], colmap: dict, ctx: dict) -> list[RateRow]:
+    """Build RateRow(s) from one data row. Wide container tables (rate split
+    across 20'/40' columns) yield ONE row per size column (an unpivot)."""
+    def get(key: str) -> Optional[str]:
+        i = colmap.get(key)
         if i is None or i >= len(cells):
             return None
         v = cells[i]
         return v.strip() if isinstance(v, str) else (str(v) if v is not None else None)
 
-    origin = get("lane_origin")
-    rate_text = get("rate")
-    # A data row needs at least an origin and something rate-like.
-    if not origin and not rate_text:
+    origin = get("origin")
+    charge = get("charge")
+    basis_text = get("basis")
+    rate_cols = colmap.get("rate_cols", [])
+    # A data row needs a lane/charge identity and at least one rate column.
+    if not origin and not charge:
+        return []
+
+    # An explicit non-container basis (per B/L, per shipment, %) applies to the
+    # whole row; a generic "per container" defers to the size column.
+    row_basis = normalize_basis(basis_text) if basis_text else None
+    if row_basis in ("per_container_20", "per_container_40"):
+        row_basis = None
+
+    source = " | ".join(c for c in cells if c and str(c).strip())
+    out: list[RateRow] = []
+    for idx, col_basis in rate_cols:
+        rate_text = get_at(cells, idx)
+        if not rate_text:
+            continue
+        row = RateRow(
+            charge_type=charge or ctx.get("section_charge_type"),
+            lane_origin=origin or None,
+            lane_destination=get("destination") or None,
+            unit=basis_text or None,
+            remark=get("remark") or None,
+            basis=row_basis or col_basis,
+            valid_from=ctx.get("valid_from"),
+            valid_to=ctx.get("valid_to"),
+            source=source,
+        )
+        amount, cur = parse_rate(rate_text)
+        row.rate = amount
+        col_cur = get("currency")
+        row.currency = (
+            col_cur.upper() if col_cur and col_cur.upper() in KNOWN_CURRENCIES
+            else cur
+        )
+        validate_row(row, raw_rate_text=rate_text)
+        out.append(row)
+    return out
+
+
+def get_at(cells: list[str], i: int) -> Optional[str]:
+    if i is None or i >= len(cells):
         return None
-
-    row = RateRow(
-        charge_type=ctx.get("section_charge_type"),
-        lane_origin=origin or None,
-        lane_destination=get("lane_destination") or None,
-        unit=get("unit") or None,
-        remark=get("remark") or None,
-        valid_from=ctx.get("valid_from"),
-        valid_to=ctx.get("valid_to"),
-        source=" | ".join(c for c in cells if c and str(c).strip()),
-    )
-
-    amount, cur = parse_rate(rate_text or "")
-    row.rate = amount
-    # explicit currency column wins over one parsed from the rate cell
-    col_cur = get("currency")
-    if col_cur and col_cur.upper() in KNOWN_CURRENCIES:
-        row.currency = col_cur.upper()
-    else:
-        row.currency = cur
-
-    validate_row(row, raw_rate_text=rate_text)
-    return row
+    v = cells[i]
+    return v.strip() if isinstance(v, str) else (str(v) if v is not None else None)
 
 
 def validate_row(row: RateRow, raw_rate_text: Optional[str] = None) -> RateRow:
@@ -274,9 +329,7 @@ def _extract_from_grid(grid: list[list[str]]) -> list[RateRow]:
             continue
         if not colmap:
             continue
-        row = row_from_cells(cells, colmap, ctx)
-        if row:
-            rows.append(row)
+        rows.extend(rows_from_cells(cells, colmap, ctx))
     return rows
 
 
@@ -336,9 +389,7 @@ def extract_pdf(path: str) -> list[RateRow]:
                     cells = ["" if c is None else str(c) for c in raw]
                     if is_header_row(cells) or looks_like_footnote(cells):
                         continue
-                    row = row_from_cells(cells, colmap, ctx)
-                    if row:
-                        rows.append(row)
+                    rows.extend(rows_from_cells(cells, colmap, ctx))
     return rows
 
 

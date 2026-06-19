@@ -60,6 +60,11 @@ KNOWN_CURRENCIES = {"USD", "ZAR", "EUR", "GBP", "ZWL", "BWP", "ZMW", "MWK",
                     "NAD", "MZN", "TZS"}
 _CURRENCY_SYMBOL = {"$": "USD", "R": "ZAR", "€": "EUR", "£": "GBP"}
 
+# Charges levied per location, not per lane — a missing origin/destination on
+# these is correct, not a defect, so don't flag it.
+LOCAL_CHARGE_CODES = {"THC", "DOC", "ISPS", "BAF", "CAF", "CUSTOMS",
+                      "WHARFAGE", "EXAM", "DEMURRAGE"}
+
 # money-critical fields: flagged harder than lane text
 _MONEY_ISSUES = ("rate", "currency", "basis")
 
@@ -101,20 +106,32 @@ def normalize_currency(value: Optional[str],
 def normalize_row(row, company_default_currency: Optional[str] = None) -> None:
     """Enrich + re-validate one RateRow in place (works on the dataclass from
     extract.py; only touches attributes, no imports back into extract)."""
-    # charge code / label from whatever charge text we have
-    label_src = " ".join(
-        x for x in [getattr(row, "charge_type", None),
-                    getattr(row, "remark", None),
-                    getattr(row, "source", None)] if x
-    )
+    # Match the charge code against the charge label FIRST, then remark, then
+    # the raw row — matching the whole row lets stray words ("% of freight" in a
+    # basis cell) cause false matches (e.g. CAF -> FREIGHT).
     row.charge_label = getattr(row, "charge_type", None)
-    match = _match_charge_code(label_src)
+    match = None
+    for candidate in (
+        getattr(row, "charge_type", None),
+        getattr(row, "remark", None),
+        getattr(row, "source", None),
+    ):
+        if candidate:
+            match = _match_charge_code(candidate)
+            if match:
+                break
     default_basis = None
     if match:
         row.charge_code, default_basis = match
 
-    # basis from the unit text, falling back to the charge code's default
-    row.basis = normalize_basis(getattr(row, "unit", None)) or default_basis
+    # basis: keep one the extractor already resolved (e.g. from a container
+    # column), else derive from the unit text, else the charge code's default.
+    preset_basis = getattr(row, "basis", None)
+    row.basis = (
+        preset_basis
+        or normalize_basis(getattr(row, "unit", None))
+        or default_basis
+    )
 
     # currency: tighten + apply company default
     row.currency = normalize_currency(
@@ -136,8 +153,13 @@ def _score_and_flag(row) -> None:
     if row.basis is None:
         confidence -= 0.3
         _flag(row, "basis unknown")
-    # lane text: softer (embarrassing, not financial)
-    if not getattr(row, "lane_origin", None):
+    # lane text: softer (embarrassing, not financial). Local charges have no
+    # lane by nature — only flag a missing origin on lane-based (freight) rows.
+    is_local = (
+        getattr(row, "charge_code", None) in LOCAL_CHARGE_CODES
+        or getattr(row, "charge_type", None) == "Local Charge"
+    )
+    if not is_local and not getattr(row, "lane_origin", None):
         confidence -= 0.1
         _flag(row, "missing origin")
     if row.charge_code != "FREIGHT":
