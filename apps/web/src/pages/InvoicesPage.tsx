@@ -5,6 +5,8 @@ import {
   getInvoice,
   updateInvoiceStatus,
   deleteInvoice,
+  openAuthedPdf,
+  sendInvoice,
   type Invoice,
 } from "../lib/api";
 import { useAsync, formatDate, formatCurrency, type NavigateFn } from "../lib/hooks";
@@ -133,6 +135,7 @@ function InvoiceDetail({
   onReload: () => void;
 }) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [sending, setSending] = useState(false);
 
   async function changeStatus(status: InvoiceStatus) {
     setUpdatingStatus(true);
@@ -143,6 +146,23 @@ function InvoiceDetail({
       alert("Failed to update status.");
     } finally {
       setUpdatingStatus(false);
+    }
+  }
+
+  async function handleSend() {
+    setSending(true);
+    try {
+      const r = await sendInvoice(invoice.id);
+      alert(
+        r.sent
+          ? `Invoice emailed to ${r.to}.`
+          : `Email not delivered: SMTP isn't configured on the server. The invoice was rendered and would be sent to ${r.to}.`,
+      );
+      onReload();
+    } catch {
+      alert("Failed to send invoice (does the customer have an email?).");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -186,10 +206,17 @@ function InvoiceDetail({
         <div className="flex items-center gap-3">
           <StatusBadge status={invoice.status} />
           <button
-            onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, "_blank")}
+            onClick={() => openAuthedPdf(`/api/invoices/${invoice.id}/pdf`)}
             className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
           >
             Download PDF
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            {sending ? "Sending…" : "Email to customer"}
           </button>
           {transitions.map((t) => (
             <button

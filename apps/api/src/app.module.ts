@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PdfModule } from "./pdf/pdf.module";
+import { MailModule } from "./mail/mail.module";
 import { AuthModule } from "./auth/auth.module";
 import { AuthGuard } from "./auth/auth.guard";
 import { HealthController } from "./health/health.controller";
@@ -16,6 +17,7 @@ import { InvoicesModule } from "./invoices/invoices.module";
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     PdfModule,
+    MailModule,
     AuthModule,
     RateSetsModule,
     CustomersModule,

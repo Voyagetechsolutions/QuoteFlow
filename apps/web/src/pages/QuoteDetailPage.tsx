@@ -1,4 +1,9 @@
-import { getQuote, createInvoiceFromQuote } from "../lib/api";
+import {
+  getQuote,
+  createInvoiceFromQuote,
+  openAuthedPdf,
+  sendQuote,
+} from "../lib/api";
 import { useAsync, formatDate, formatCurrency, cn, type NavigateFn } from "../lib/hooks";
 import { StatusBadge } from "../components/StatusBadge";
 import { useState } from "react";
@@ -9,8 +14,34 @@ interface Props {
 }
 
 export function QuoteDetailPage({ quoteId, navigate }: Props) {
-  const { data: quote, loading, error } = useAsync(() => getQuote(quoteId), [quoteId]);
+  const { data: quote, loading, error, reload } = useAsync(
+    () => getQuote(quoteId),
+    [quoteId],
+  );
   const [converting, setConverting] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  async function handleSend() {
+    if (!quote) return;
+    setSending(true);
+    try {
+      const r = await sendQuote(quote.id);
+      alert(
+        r.sent
+          ? `Quote emailed to ${r.to}.`
+          : `Email not delivered: SMTP isn't configured on the server. The quote was rendered and would be sent to ${r.to}. (Status set to Sent.)`,
+      );
+      reload();
+    } catch (e) {
+      alert(
+        e instanceof Error && e.message.includes("email")
+          ? "This customer has no email address on file."
+          : "Failed to send quote.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
 
   async function handleConvert() {
     if (!quote) return;
@@ -54,10 +85,17 @@ export function QuoteDetailPage({ quoteId, navigate }: Props) {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => window.open(`/api/quotes/${quote.id}/pdf`, "_blank")}
+            onClick={() => openAuthedPdf(`/api/quotes/${quote.id}/pdf`)}
             className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
           >
             Download PDF
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            {sending ? "Sending…" : "Email to customer"}
           </button>
           <button
             onClick={() => navigate({ name: "quote-builder", editId: quote.id })}

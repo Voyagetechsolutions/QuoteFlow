@@ -89,6 +89,39 @@ export const logout = (): void => {
   window.dispatchEvent(new Event("qf-unauthorized"));
 };
 
+/**
+ * Open an authenticated binary endpoint (e.g. a PDF) in a new tab. window.open
+ * can't send the Authorization header, so fetch it as a blob and open that.
+ */
+export async function openAuthedPdf(path: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearToken();
+      window.dispatchEvent(new Event("qf-unauthorized"));
+    }
+    throw new ApiError(res.status, await res.text().catch(() => ""));
+  }
+  const url = URL.createObjectURL(await res.blob());
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export interface SendResult {
+  sent: boolean;
+  preview?: boolean;
+  to: string;
+}
+
+export const sendQuote = (id: string): Promise<SendResult> =>
+  request<SendResult>(`/api/quotes/${id}/send`, { method: "POST" });
+
+export const sendInvoice = (id: string): Promise<SendResult> =>
+  request<SendResult>(`/api/invoices/${id}/send`, { method: "POST" });
+
 // ─── Rate Sets ──────────────────────────────────────────────────
 
 export interface RateSet {

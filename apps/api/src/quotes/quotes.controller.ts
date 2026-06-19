@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -18,6 +19,7 @@ import {
 } from './quotes.service';
 import { PdfService } from '../pdf/pdf.service';
 import { documentHtml } from '../pdf/templates';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompanyId } from '../auth/current-user.decorator';
 
@@ -26,21 +28,12 @@ export class QuotesController {
   constructor(
     private readonly quotesService: QuotesService,
     private readonly pdf: PdfService,
+    private readonly mail: MailService,
     private readonly prisma: PrismaService,
   ) {}
 
-  @Post()
-  create(@CompanyId() companyId: string, @Body() body: CreateQuoteDto) {
-    return this.quotesService.create(companyId, body);
-  }
-
-  /** Branded customer-facing PDF (sell prices only — no cost/margin). */
-  @Get(':id/pdf')
-  async downloadPdf(
-    @CompanyId() companyId: string,
-    @Param('id') id: string,
-    @Res() res: Response,
-  ): Promise<void> {
+  /** Render a quote to a branded PDF buffer (sell prices only). */
+  private async renderPdf(companyId: string, id: string) {
     const quote: any = await this.quotesService.findOne(companyId, id);
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
@@ -63,13 +56,49 @@ export class QuotesController {
       },
       { name: company?.name ?? 'QuoteFlow' },
     );
-    const buf = await this.pdf.render(html);
+    return { buffer: await this.pdf.render(html), quote, company };
+  }
+
+  @Post()
+  create(@CompanyId() companyId: string, @Body() body: CreateQuoteDto) {
+    return this.quotesService.create(companyId, body);
+  }
+
+  /** Branded customer-facing PDF (sell prices only — no cost/margin). */
+  @Get(':id/pdf')
+  async downloadPdf(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, quote } = await this.renderPdf(companyId, id);
     res
       .set({
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="${quote.number}.pdf"`,
       })
-      .send(buf);
+      .send(buffer);
+  }
+
+  /** Email the quote PDF to the customer and mark it SENT. */
+  @Post(':id/send')
+  async send(@CompanyId() companyId: string, @Param('id') id: string) {
+    const { buffer, quote, company } = await this.renderPdf(companyId, id);
+    const to = quote.customer?.email;
+    if (!to) {
+      throw new BadRequestException(
+        'Customer has no email address on file.',
+      );
+    }
+    const result = await this.mail.sendDocument({
+      to,
+      subject: `Quotation ${quote.number} from ${company?.name ?? 'QuoteFlow'}`,
+      text: `Dear ${quote.customer.name},\n\nPlease find attached quotation ${quote.number}.\n\nRegards,\n${company?.name ?? 'QuoteFlow'}`,
+      filename: `${quote.number}.pdf`,
+      pdf: buffer,
+    });
+    await this.quotesService.update(companyId, id, { status: 'SENT' });
+    return result;
   }
 
   @Get()
