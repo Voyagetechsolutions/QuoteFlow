@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Page, NavigateFn } from "../lib/hooks";
 import { cn } from "../lib/hooks";
 import { logout } from "../lib/api";
+import { Logo } from "./Logo";
 
 interface LayoutProps {
   page: Page;
@@ -66,13 +67,8 @@ export function Layout({ page, navigate, children }: LayoutProps) {
       {/* Sidebar */}
       <aside className="flex w-60 flex-col bg-slate-900 text-slate-300">
         {/* Brand */}
-        <div className="flex h-16 items-center gap-2.5 px-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-sm font-bold text-white">
-            Q
-          </div>
-          <span className="text-lg font-semibold tracking-tight text-white">
-            QuoteFlow
-          </span>
+        <div className="flex h-16 items-center px-5">
+          <Logo variant="light" size="md" />
         </div>
 
         {/* Nav links */}

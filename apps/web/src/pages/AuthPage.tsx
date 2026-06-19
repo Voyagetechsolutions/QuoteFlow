@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { login, register } from "../lib/api";
+import { Logo } from "../components/Logo";
 
 export function AuthPage({ onAuthed }: { onAuthed: () => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -34,11 +35,8 @@ export function AuthPage({ onAuthed }: { onAuthed: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 font-bold text-white">
-            Q
-          </div>
-          <span className="text-xl font-semibold text-slate-900">QuoteFlow</span>
+        <div className="mb-6 flex justify-center">
+          <Logo variant="navy" size="lg" />
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
