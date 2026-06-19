@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
+
+const DEMO_EMAIL = 'demo@quoteflow.com';
+const DEMO_PASSWORD = 'demopass1';
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -17,19 +21,20 @@ async function main() {
 
   console.log(`✅ Created company: ${company.name} (${company.id})`);
 
-  // Create a demo user
+  // Create a demo user with a real (login-able) password hash.
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   const user = await prisma.user.upsert({
-    where: { email: 'demo@quoteflow.com' },
-    update: {},
+    where: { email: DEMO_EMAIL },
+    update: { passwordHash },
     create: {
       companyId: company.id,
-      email: 'demo@quoteflow.com',
-      passwordHash: 'demo-hash-placeholder', // Replace with actual hash in production
+      email: DEMO_EMAIL,
+      passwordHash,
       role: 'OWNER',
     },
   });
 
-  console.log(`✅ Created user: ${user.email}`);
+  console.log(`✅ Created user: ${user.email}  (login: ${DEMO_EMAIL} / ${DEMO_PASSWORD})`);
 
   // Create some demo customers
   const customer1 = await prisma.customer.upsert({

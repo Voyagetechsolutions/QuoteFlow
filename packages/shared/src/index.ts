@@ -30,6 +30,7 @@ export type ChargeType = (typeof CHARGE_TYPES)[number] | string;
 export const BASES = [
   "per_container_20",
   "per_container_40",
+  "per_truck",
   "per_cbm",
   "per_kg",
   "per_shipment",

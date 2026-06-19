@@ -47,6 +47,7 @@ BASIS_ALIASES: dict[str, list[str]] = {
                          "40dc", "40 ft", "40ft", "40'", "per 40", "40'hq"],
     "per_container_20": ["20'gp", "20gp", "20'dc", "20dc", "20 ft", "20ft",
                          "20'", "per 20", "teu", "per container", "per box"],
+    "per_truck": ["per truck", "per vehicle", "per load", "ftl", "per trip"],
     "per_cbm": ["per cbm", "cbm", "m3", "w/m", "per m3", "cubic"],
     "per_kg": ["per kg", "/kg", " kg", "per ton", "per tonne", "per mt"],
     "per_bl": ["per bl", "per b/l", "per bill", "/bl"],
