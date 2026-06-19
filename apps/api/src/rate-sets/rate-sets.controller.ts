@@ -13,9 +13,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RateSetsService, CreateRateSetDto, UpdateRateRowDto } from './rate-sets.service';
 import { ExtractionService, UploadedRateSheet } from './extraction.service';
-
-// TODO: companyId will come from auth JWT once auth is implemented
-const DEMO_COMPANY_ID = 'demo-company-001';
+import { CompanyId } from '../auth/current-user.decorator';
 
 @Controller('rate-sets')
 export class RateSetsController {
@@ -27,7 +25,8 @@ export class RateSetsController {
   /**
    * Stateless extraction: upload a rate sheet, get back the extracted rows for
    * review. Nothing is persisted here — the user reviews/edits, then POST /
-   * to save (PRD Flow A: review before save). Needs no database.
+   * to save (PRD Flow A: review before save). Needs no database, but auth'd —
+   * it runs compute (and potentially paid vision calls).
    */
   @Post('extract')
   @UseInterceptors(FileInterceptor('file'))
@@ -39,31 +38,32 @@ export class RateSetsController {
   }
 
   @Post()
-  create(@Body() body: CreateRateSetDto) {
-    return this.rateSetsService.create(DEMO_COMPANY_ID, body);
+  create(@CompanyId() companyId: string, @Body() body: CreateRateSetDto) {
+    return this.rateSetsService.create(companyId, body);
   }
 
   @Get()
-  findAll() {
-    return this.rateSetsService.findAll(DEMO_COMPANY_ID);
+  findAll(@CompanyId() companyId: string) {
+    return this.rateSetsService.findAll(companyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.rateSetsService.findOne(DEMO_COMPANY_ID, id);
+  findOne(@CompanyId() companyId: string, @Param('id') id: string) {
+    return this.rateSetsService.findOne(companyId, id);
   }
 
   @Patch(':id/rows/:rowId')
   updateRow(
+    @CompanyId() companyId: string,
     @Param('id') id: string,
     @Param('rowId') rowId: string,
     @Body() body: UpdateRateRowDto,
   ) {
-    return this.rateSetsService.updateRow(DEMO_COMPANY_ID, id, rowId, body);
+    return this.rateSetsService.updateRow(companyId, id, rowId, body);
   }
 
   @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.rateSetsService.delete(DEMO_COMPANY_ID, id);
+  delete(@CompanyId() companyId: string, @Param('id') id: string) {
+    return this.rateSetsService.delete(companyId, id);
   }
 }

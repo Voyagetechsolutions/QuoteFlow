@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Page, NavigateFn } from "../lib/hooks";
 import { cn } from "../lib/hooks";
+import { logout } from "../lib/api";
 
 interface LayoutProps {
   page: Page;
@@ -115,6 +116,12 @@ export function Layout({ page, navigate, children }: LayoutProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
               U
             </div>
+            <button
+              onClick={logout}
+              className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            >
+              Sign out
+            </button>
           </div>
         </header>
 

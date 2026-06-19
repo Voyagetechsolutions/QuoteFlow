@@ -13,9 +13,7 @@ import { InvoicesService, CreateInvoiceFromQuoteDto } from './invoices.service';
 import { PdfService } from '../pdf/pdf.service';
 import { documentHtml } from '../pdf/templates';
 import { PrismaService } from '../prisma/prisma.service';
-
-// TODO: companyId will come from auth JWT once auth is implemented
-const DEMO_COMPANY_ID = 'demo-company-001';
+import { CompanyId } from '../auth/current-user.decorator';
 
 @Controller('invoices')
 export class InvoicesController {
@@ -26,19 +24,23 @@ export class InvoicesController {
   ) {}
 
   @Post('from-quote')
-  createFromQuote(@Body() body: CreateInvoiceFromQuoteDto) {
-    return this.invoicesService.createFromQuote(DEMO_COMPANY_ID, body);
+  createFromQuote(
+    @CompanyId() companyId: string,
+    @Body() body: CreateInvoiceFromQuoteDto,
+  ) {
+    return this.invoicesService.createFromQuote(companyId, body);
   }
 
   /** Branded customer-facing invoice PDF. */
   @Get(':id/pdf')
   async downloadPdf(
+    @CompanyId() companyId: string,
     @Param('id') id: string,
     @Res() res: Response,
   ): Promise<void> {
-    const inv: any = await this.invoicesService.findOne(DEMO_COMPANY_ID, id);
+    const inv: any = await this.invoicesService.findOne(companyId, id);
     const company = await this.prisma.company.findUnique({
-      where: { id: DEMO_COMPANY_ID },
+      where: { id: companyId },
     });
     const currency = inv.lines?.[0]?.currency ?? 'USD';
     const html = documentHtml(
@@ -69,25 +71,26 @@ export class InvoicesController {
   }
 
   @Get()
-  findAll() {
-    return this.invoicesService.findAll(DEMO_COMPANY_ID);
+  findAll(@CompanyId() companyId: string) {
+    return this.invoicesService.findAll(companyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.invoicesService.findOne(DEMO_COMPANY_ID, id);
+  findOne(@CompanyId() companyId: string, @Param('id') id: string) {
+    return this.invoicesService.findOne(companyId, id);
   }
 
   @Patch(':id/status')
   updateStatus(
+    @CompanyId() companyId: string,
     @Param('id') id: string,
     @Body('status') status: 'DRAFT' | 'SENT' | 'PARTIAL' | 'PAID',
   ) {
-    return this.invoicesService.updateStatus(DEMO_COMPANY_ID, id, status);
+    return this.invoicesService.updateStatus(companyId, id, status);
   }
 
   @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.invoicesService.delete(DEMO_COMPANY_ID, id);
+  delete(@CompanyId() companyId: string, @Param('id') id: string) {
+    return this.invoicesService.delete(companyId, id);
   }
 }

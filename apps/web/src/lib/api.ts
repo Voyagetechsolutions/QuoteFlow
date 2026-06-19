@@ -16,10 +16,21 @@ async function request<T>(
   url: string,
   opts: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
-    ...opts,
-  });
+  const headers: Record<string, string> = { ...(opts.headers as object) };
+  // Don't force JSON content-type on FormData (multipart) uploads.
+  if (!(opts.body instanceof FormData) && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(url, { ...opts, headers });
+
+  if (res.status === 401 && !url.startsWith("/api/auth")) {
+    // Session expired/invalid — drop it and let the app fall back to login.
+    clearToken();
+    window.dispatchEvent(new Event("qf-unauthorized"));
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new ApiError(res.status, body || res.statusText);
@@ -34,6 +45,49 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+// ─── Auth ───────────────────────────────────────────────────────
+
+const TOKEN_KEY = "qf_token";
+export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
+const setToken = (t: string): void => localStorage.setItem(TOKEN_KEY, t);
+export const clearToken = (): void => localStorage.removeItem(TOKEN_KEY);
+
+export interface AuthUser {
+  id: string;
+  companyId: string;
+  role: string;
+  email: string;
+}
+
+export async function login(email: string, password: string): Promise<AuthUser> {
+  const r = await request<{ accessToken: string; user: AuthUser }>(
+    "/api/auth/login",
+    { method: "POST", body: JSON.stringify({ email, password }) },
+  );
+  setToken(r.accessToken);
+  return r.user;
+}
+
+export async function register(
+  companyName: string,
+  email: string,
+  password: string,
+): Promise<AuthUser> {
+  const r = await request<{ accessToken: string; user: AuthUser }>(
+    "/api/auth/register",
+    { method: "POST", body: JSON.stringify({ companyName, email, password }) },
+  );
+  setToken(r.accessToken);
+  return r.user;
+}
+
+export const getMe = (): Promise<AuthUser> => request<AuthUser>("/api/auth/me");
+
+export const logout = (): void => {
+  clearToken();
+  window.dispatchEvent(new Event("qf-unauthorized"));
+};
 
 // ─── Rate Sets ──────────────────────────────────────────────────
 

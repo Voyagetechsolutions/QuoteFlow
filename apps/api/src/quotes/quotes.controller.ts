@@ -19,9 +19,7 @@ import {
 import { PdfService } from '../pdf/pdf.service';
 import { documentHtml } from '../pdf/templates';
 import { PrismaService } from '../prisma/prisma.service';
-
-// TODO: companyId will come from auth JWT once auth is implemented
-const DEMO_COMPANY_ID = 'demo-company-001';
+import { CompanyId } from '../auth/current-user.decorator';
 
 @Controller('quotes')
 export class QuotesController {
@@ -32,19 +30,20 @@ export class QuotesController {
   ) {}
 
   @Post()
-  create(@Body() body: CreateQuoteDto) {
-    return this.quotesService.create(DEMO_COMPANY_ID, body);
+  create(@CompanyId() companyId: string, @Body() body: CreateQuoteDto) {
+    return this.quotesService.create(companyId, body);
   }
 
   /** Branded customer-facing PDF (sell prices only — no cost/margin). */
   @Get(':id/pdf')
   async downloadPdf(
+    @CompanyId() companyId: string,
     @Param('id') id: string,
     @Res() res: Response,
   ): Promise<void> {
-    const quote: any = await this.quotesService.findOne(DEMO_COMPANY_ID, id);
+    const quote: any = await this.quotesService.findOne(companyId, id);
     const company = await this.prisma.company.findUnique({
-      where: { id: DEMO_COMPANY_ID },
+      where: { id: companyId },
     });
     const html = documentHtml(
       {
@@ -74,41 +73,54 @@ export class QuotesController {
   }
 
   @Get()
-  findAll() {
-    return this.quotesService.findAll(DEMO_COMPANY_ID);
+  findAll(@CompanyId() companyId: string) {
+    return this.quotesService.findAll(companyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.quotesService.findOne(DEMO_COMPANY_ID, id);
+  findOne(@CompanyId() companyId: string, @Param('id') id: string) {
+    return this.quotesService.findOne(companyId, id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateQuoteDto) {
-    return this.quotesService.update(DEMO_COMPANY_ID, id, body);
+  update(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Body() body: UpdateQuoteDto,
+  ) {
+    return this.quotesService.update(companyId, id, body);
   }
 
   @Post(':id/lines')
-  addLine(@Param('id') id: string, @Body() body: CreateQuoteLineDto) {
-    return this.quotesService.addLine(DEMO_COMPANY_ID, id, body);
+  addLine(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Body() body: CreateQuoteLineDto,
+  ) {
+    return this.quotesService.addLine(companyId, id, body);
   }
 
   @Patch(':id/lines/:lineId')
   updateLine(
+    @CompanyId() companyId: string,
     @Param('id') id: string,
     @Param('lineId') lineId: string,
     @Body() body: UpdateQuoteLineDto,
   ) {
-    return this.quotesService.updateLine(DEMO_COMPANY_ID, id, lineId, body);
+    return this.quotesService.updateLine(companyId, id, lineId, body);
   }
 
   @Delete(':id/lines/:lineId')
-  deleteLine(@Param('id') id: string, @Param('lineId') lineId: string) {
-    return this.quotesService.deleteLine(DEMO_COMPANY_ID, id, lineId);
+  deleteLine(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Param('lineId') lineId: string,
+  ) {
+    return this.quotesService.deleteLine(companyId, id, lineId);
   }
 
   @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.quotesService.delete(DEMO_COMPANY_ID, id);
+  delete(@CompanyId() companyId: string, @Param('id') id: string) {
+    return this.quotesService.delete(companyId, id);
   }
 }
