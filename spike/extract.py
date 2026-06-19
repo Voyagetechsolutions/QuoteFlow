@@ -160,6 +160,21 @@ def parse_rate(text: str) -> tuple[Optional[float], Optional[str]]:
     return amount, cur
 
 
+# Sheet-level default currency, e.g. "All rates quoted in USD unless otherwise".
+_DEFAULT_CUR_RE = re.compile(
+    r"\b(?:rates?|prices?|amounts?|charges?|all|quoted)\b[^.\n]{0,40}?"
+    r"\b(USD|ZAR|ZWL|EUR|GBP|BWP|ZMW|MWK|NAD|MZN|TZS)\b",
+    re.IGNORECASE,
+)
+
+
+def detect_default_currency(text: Optional[str]) -> Optional[str]:
+    if not text:
+        return None
+    m = _DEFAULT_CUR_RE.search(text)
+    return m.group(1).upper() if m else None
+
+
 def charge_type_for(section: Optional[str]) -> Optional[str]:
     if not section:
         return None
@@ -274,7 +289,7 @@ def rows_from_cells(cells: list[str], colmap: dict, ctx: dict) -> list[RateRow]:
         row.currency = (
             col_cur.upper() if col_cur and col_cur.upper() in KNOWN_CURRENCIES
             else cur
-        )
+        ) or ctx.get("default_currency")
         validate_row(row, raw_rate_text=rate_text)
         out.append(row)
     return out
@@ -311,6 +326,10 @@ def _extract_from_grid(grid: list[list[str]]) -> list[RateRow]:
     rows: list[RateRow] = []
     ctx: dict = {}
     colmap: dict[str, int] = {}
+
+    dc = detect_default_currency(" ".join(c for row in grid for c in row))
+    if dc:
+        ctx["default_currency"] = dc
 
     for cells in grid:
         vf, vt = parse_validity(" ".join(cells))
@@ -359,12 +378,15 @@ def extract_pdf(path: str) -> list[RateRow]:
 
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
-            # carry free-text validity from the page text
+            # carry free-text validity + sheet-default currency from page text
             text = page.extract_text() or ""
             vf, vt = parse_validity(text)
             if vf or vt:
                 ctx.setdefault("valid_from", vf)
                 ctx.setdefault("valid_to", vt)
+            dc = detect_default_currency(text)
+            if dc:
+                ctx.setdefault("default_currency", dc)
 
             # Section headings are separate objects floating above their tables.
             # Record each heading's vertical position so we can bind a table to
