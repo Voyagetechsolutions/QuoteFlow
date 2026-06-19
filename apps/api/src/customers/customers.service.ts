@@ -1,16 +1,33 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 
-export interface CreateCustomerDto {
-  name: string;
+export class CreateCustomerDto {
+  @IsString()
+  @MinLength(1)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
   email?: string;
+
+  @IsOptional()
+  @IsString()
   contact?: string;
 }
 
-export interface UpdateCustomerDto {
+export class UpdateCustomerDto {
+  @IsOptional()
+  @IsString()
   name?: string;
-  email?: string | null;
-  contact?: string | null;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  contact?: string;
 }
 
 @Injectable()

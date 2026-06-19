@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -6,8 +7,12 @@ import { Prisma } from '@prisma/client';
 /*  DTOs                                                               */
 /* ------------------------------------------------------------------ */
 
-export interface CreateInvoiceFromQuoteDto {
-  quoteId: string;
+export class CreateInvoiceFromQuoteDto {
+  @IsString()
+  quoteId!: string;
+
+  @IsOptional()
+  @IsString()
   dueDate?: string; // ISO date
 }
 

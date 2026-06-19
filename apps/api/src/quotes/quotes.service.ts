@@ -3,6 +3,17 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import {
+  IsArray,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -10,28 +21,66 @@ import { Prisma } from '@prisma/client';
 /*  DTOs                                                               */
 /* ------------------------------------------------------------------ */
 
-export interface CreateQuoteLineDto {
-  description: string;
+export class CreateQuoteLineDto {
+  @IsString()
+  @MinLength(1)
+  description!: string;
+
+  @IsOptional()
+  @IsString()
   chargeType?: string;
+
+  @IsOptional()
+  @IsString()
   unit?: string;
-  costRate: number;
-  sellRate: number;
-  marginPct: number;
-  currency: string;
+
+  @IsNumber()
+  costRate!: number;
+
+  @IsNumber()
+  sellRate!: number;
+
+  @IsNumber()
+  marginPct!: number;
+
+  @IsString()
+  currency!: string;
 }
 
-export interface CreateQuoteDto {
-  customerId: string;
+export class CreateQuoteDto {
+  @IsString()
+  customerId!: string;
+
+  @IsOptional()
+  @IsString()
   currency?: string;
+
+  @IsOptional()
+  @IsNumber()
   defaultMarginPct?: number;
-  lines: CreateQuoteLineDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateQuoteLineDto)
+  lines!: CreateQuoteLineDto[];
 }
 
-export interface CreateQuoteFromRateSetDto {
-  rateSetId: string;
-  customerId: string;
+export class CreateQuoteFromRateSetDto {
+  @IsString()
+  rateSetId!: string;
+
+  @IsString()
+  customerId!: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   marginPct?: number;
+
   /** Rate-row ids to include; omitted = all priced rows. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   rowIds?: string[];
 }
 
@@ -65,19 +114,47 @@ function describeRateRow(r: {
   return `${what}${lane}${basis}`;
 }
 
-export interface UpdateQuoteDto {
+export class UpdateQuoteDto {
+  @IsOptional()
+  @IsIn(['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED'])
   status?: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED';
+
+  @IsOptional()
+  @IsString()
   currency?: string;
+
+  @IsOptional()
+  @IsNumber()
   defaultMarginPct?: number;
 }
 
-export interface UpdateQuoteLineDto {
+export class UpdateQuoteLineDto {
+  @IsOptional()
+  @IsString()
   description?: string;
-  chargeType?: string | null;
-  unit?: string | null;
+
+  @IsOptional()
+  @IsString()
+  chargeType?: string;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @IsNumber()
   costRate?: number;
+
+  @IsOptional()
+  @IsNumber()
   sellRate?: number;
+
+  @IsOptional()
+  @IsNumber()
   marginPct?: number;
+
+  @IsOptional()
+  @IsString()
   currency?: string;
 }
 
