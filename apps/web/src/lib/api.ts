@@ -371,6 +371,42 @@ export function updateInvoiceStatus(
   });
 }
 
+export const updateInvoice = (
+  id: string,
+  data: { dueDate?: string | null },
+): Promise<Invoice> =>
+  request<Invoice>(`/api/invoices/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+
+export const addInvoiceLine = (
+  id: string,
+  line: { description: string; amount: number; currency: string },
+): Promise<Invoice> =>
+  request<Invoice>(`/api/invoices/${id}/lines`, {
+    method: "POST",
+    body: JSON.stringify(line),
+  });
+
+export const updateInvoiceLine = (
+  id: string,
+  lineId: string,
+  patch: { description?: string; amount?: number; currency?: string },
+): Promise<Invoice> =>
+  request<Invoice>(`/api/invoices/${id}/lines/${lineId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+
+export const deleteInvoiceLine = (
+  id: string,
+  lineId: string,
+): Promise<Invoice> =>
+  request<Invoice>(`/api/invoices/${id}/lines/${lineId}`, {
+    method: "DELETE",
+  });
+
 export function deleteInvoice(id: string): Promise<void> {
   return request(`/api/invoices/${id}`, { method: "DELETE" });
 }

@@ -7,6 +7,9 @@ import {
   deleteInvoice,
   openAuthedPdf,
   sendInvoice,
+  addInvoiceLine,
+  updateInvoiceLine,
+  deleteInvoiceLine,
   type Invoice,
 } from "../lib/api";
 import { useAsync, formatDate, formatCurrency, type NavigateFn } from "../lib/hooks";
@@ -137,6 +140,90 @@ function InvoiceDetail({
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [sending, setSending] = useState(false);
 
+  type EditLine = {
+    id?: string;
+    description: string;
+    amount: number | string;
+    currency: string;
+    key: string;
+  };
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<EditLine[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  function startEdit() {
+    setDraft(
+      (invoice.lines ?? []).map((l, i) => ({
+        id: l.id,
+        description: l.description,
+        amount: l.amount,
+        currency: l.currency,
+        key: l.id ?? `orig-${i}`,
+      })),
+    );
+    setEditing(true);
+  }
+
+  function patchLine(key: string, patch: Partial<EditLine>) {
+    setDraft((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  }
+
+  function addDraftLine() {
+    setDraft((prev) => [
+      ...prev,
+      {
+        description: "",
+        amount: "",
+        currency: invoice.lines?.[0]?.currency ?? "USD",
+        key: `new-${Date.now()}-${Math.random()}`,
+      },
+    ]);
+  }
+
+  async function saveEdit() {
+    setSavingEdit(true);
+    try {
+      const original = invoice.lines ?? [];
+      const draftIds = new Set(draft.filter((d) => d.id).map((d) => d.id));
+      // deletions
+      for (const o of original) {
+        if (o.id && !draftIds.has(o.id)) await deleteInvoiceLine(invoice.id, o.id);
+      }
+      // updates + additions
+      for (const d of draft) {
+        if (!d.description.trim()) continue;
+        const amount = Number(d.amount) || 0;
+        if (d.id) {
+          const o = original.find((x) => x.id === d.id);
+          if (
+            o &&
+            (o.description !== d.description ||
+              o.amount !== amount ||
+              o.currency !== d.currency)
+          ) {
+            await updateInvoiceLine(invoice.id, d.id, {
+              description: d.description,
+              amount,
+              currency: d.currency,
+            });
+          }
+        } else {
+          await addInvoiceLine(invoice.id, {
+            description: d.description,
+            amount,
+            currency: d.currency,
+          });
+        }
+      }
+      setEditing(false);
+      onReload();
+    } catch {
+      alert("Could not save invoice changes.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   async function changeStatus(status: InvoiceStatus) {
     setUpdatingStatus(true);
     try {
@@ -203,31 +290,57 @@ function InvoiceDetail({
             {invoice.customerName} · {formatDate(invoice.createdAt)}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <StatusBadge status={invoice.status} />
-          <button
-            onClick={() => openAuthedPdf(`/api/invoices/${invoice.id}/pdf`)}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            Download PDF
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={sending}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-          >
-            {sending ? "Sending…" : "Email to customer"}
-          </button>
-          {transitions.map((t) => (
-            <button
-              key={t.to}
-              onClick={() => changeStatus(t.to)}
-              disabled={updatingStatus}
-              className={`rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50 ${t.color}`}
-            >
-              {t.label}
-            </button>
-          ))}
+          {editing ? (
+            <>
+              <button
+                onClick={() => setEditing(false)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {savingEdit ? "Saving…" : "Save changes"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={startEdit}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => openAuthedPdf(`/api/invoices/${invoice.id}/pdf`)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                Download PDF
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={sending}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+              >
+                {sending ? "Sending…" : "Email to customer"}
+              </button>
+              {transitions.map((t) => (
+                <button
+                  key={t.to}
+                  onClick={() => changeStatus(t.to)}
+                  disabled={updatingStatus}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50 ${t.color}`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -239,30 +352,95 @@ function InvoiceDetail({
               <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3 text-right">Amount</th>
               <th className="px-4 py-3">Currency</th>
+              {editing && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {invoice.lines?.map((line, i) => (
-              <tr key={line.id ?? i} className="hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-700">{line.description}</td>
-                <td className="px-4 py-3 text-right font-medium text-slate-900">
-                  {formatCurrency(line.amount, line.currency)}
+            {editing
+              ? draft.map((line) => (
+                  <tr key={line.key}>
+                    <td className="px-3 py-2">
+                      <input
+                        value={line.description}
+                        onChange={(e) =>
+                          patchLine(line.key, { description: e.target.value })
+                        }
+                        placeholder="Description"
+                        className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={line.amount}
+                        onChange={(e) =>
+                          patchLine(line.key, { amount: e.target.value })
+                        }
+                        className="w-28 rounded border border-slate-300 px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:ring-2 focus:ring-slate-400"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        value={line.currency}
+                        onChange={(e) =>
+                          patchLine(line.key, {
+                            currency: e.target.value.toUpperCase(),
+                          })
+                        }
+                        className="w-16 rounded border border-slate-300 px-2 py-1.5 text-sm uppercase outline-none focus:ring-2 focus:ring-slate-400"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        onClick={() =>
+                          setDraft((prev) =>
+                            prev.filter((l) => l.key !== line.key),
+                          )
+                        }
+                        className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              : invoice.lines?.map((line, i) => (
+                  <tr key={line.id ?? i} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-slate-700">
+                      {line.description}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-900">
+                      {formatCurrency(line.amount, line.currency)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{line.currency}</td>
+                  </tr>
+                ))}
+            {editing && (
+              <tr>
+                <td colSpan={4} className="px-3 py-2">
+                  <button
+                    onClick={addDraftLine}
+                    className="rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    + Add line
+                  </button>
                 </td>
-                <td className="px-4 py-3 text-slate-500">{line.currency}</td>
               </tr>
-            ))}
+            )}
           </tbody>
-          <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50">
-              <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                Total
-              </td>
-              <td className="px-4 py-3 text-right text-lg font-bold text-slate-900">
-                {formatCurrency(invoice.total)}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
+          {!editing && (
+            <tfoot>
+              <tr className="border-t border-slate-200 bg-slate-50">
+                <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                  Total
+                </td>
+                <td className="px-4 py-3 text-right text-lg font-bold text-slate-900">
+                  {formatCurrency(invoice.total)}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -14,6 +14,38 @@ export class CreateInvoiceFromQuoteDto {
   @IsOptional()
   @IsString()
   dueDate?: string; // ISO date
+}
+
+export class UpdateInvoiceDto {
+  @IsOptional()
+  @IsString()
+  dueDate?: string | null; // ISO date, or null to clear
+}
+
+export class CreateInvoiceLineDto {
+  @IsString()
+  @MinLength(1)
+  description!: string;
+
+  @IsNumber()
+  amount!: number;
+
+  @IsString()
+  currency!: string;
+}
+
+export class UpdateInvoiceLineDto {
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsNumber()
+  amount?: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -195,6 +227,85 @@ export class InvoicesService {
     });
 
     return this.serialiseInvoice(updated);
+  }
+
+  /** Edit the invoice header (currently the due date). */
+  async update(
+    companyId: string,
+    id: string,
+    data: UpdateInvoiceDto,
+  ) {
+    await this.ensureInvoice(companyId, id);
+    const updated = await this.prisma.invoice.update({
+      where: { id },
+      data: {
+        dueDate:
+          data.dueDate === undefined
+            ? undefined
+            : data.dueDate
+              ? new Date(data.dueDate)
+              : null,
+      },
+      include: { lines: true, customer: true },
+    });
+    return this.serialiseInvoice(updated);
+  }
+
+  /** Add a line to an invoice. */
+  async addLine(companyId: string, id: string, data: CreateInvoiceLineDto) {
+    await this.ensureInvoice(companyId, id);
+    await this.prisma.invoiceLine.create({
+      data: {
+        invoiceId: id,
+        description: data.description,
+        amount: new Prisma.Decimal(data.amount),
+        currency: data.currency,
+      },
+    });
+    return this.findOne(companyId, id);
+  }
+
+  /** Update one invoice line. */
+  async updateLine(
+    companyId: string,
+    id: string,
+    lineId: string,
+    data: UpdateInvoiceLineDto,
+  ) {
+    await this.ensureInvoice(companyId, id);
+    const line = await this.prisma.invoiceLine.findFirst({
+      where: { id: lineId, invoiceId: id },
+    });
+    if (!line) {
+      throw new NotFoundException(`Invoice line ${lineId} not found`);
+    }
+    const patch: Record<string, unknown> = {};
+    if (data.description !== undefined) patch.description = data.description;
+    if (data.amount !== undefined) patch.amount = new Prisma.Decimal(data.amount);
+    if (data.currency !== undefined) patch.currency = data.currency;
+    await this.prisma.invoiceLine.update({ where: { id: lineId }, data: patch });
+    return this.findOne(companyId, id);
+  }
+
+  /** Delete one invoice line. */
+  async deleteLine(companyId: string, id: string, lineId: string) {
+    await this.ensureInvoice(companyId, id);
+    const line = await this.prisma.invoiceLine.findFirst({
+      where: { id: lineId, invoiceId: id },
+    });
+    if (!line) {
+      throw new NotFoundException(`Invoice line ${lineId} not found`);
+    }
+    await this.prisma.invoiceLine.delete({ where: { id: lineId } });
+    return this.findOne(companyId, id);
+  }
+
+  private async ensureInvoice(companyId: string, id: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, companyId },
+    });
+    if (!invoice) throw new NotFoundException(`Invoice ${id} not found`);
+    return invoice;
   }
 
   /** Delete an invoice and all its lines (cascade). */

@@ -10,7 +10,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { InvoicesService, CreateInvoiceFromQuoteDto } from './invoices.service';
+import {
+  InvoicesService,
+  CreateInvoiceFromQuoteDto,
+  UpdateInvoiceDto,
+  CreateInvoiceLineDto,
+  UpdateInvoiceLineDto,
+} from './invoices.service';
 import { PdfService } from '../pdf/pdf.service';
 import { documentHtml } from '../pdf/templates';
 import { MailService } from '../mail/mail.service';
@@ -116,6 +122,43 @@ export class InvoicesController {
     @Body('status') status: 'DRAFT' | 'SENT' | 'PARTIAL' | 'PAID',
   ) {
     return this.invoicesService.updateStatus(companyId, id, status);
+  }
+
+  @Patch(':id')
+  update(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Body() body: UpdateInvoiceDto,
+  ) {
+    return this.invoicesService.update(companyId, id, body);
+  }
+
+  @Post(':id/lines')
+  addLine(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Body() body: CreateInvoiceLineDto,
+  ) {
+    return this.invoicesService.addLine(companyId, id, body);
+  }
+
+  @Patch(':id/lines/:lineId')
+  updateLine(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Param('lineId') lineId: string,
+    @Body() body: UpdateInvoiceLineDto,
+  ) {
+    return this.invoicesService.updateLine(companyId, id, lineId, body);
+  }
+
+  @Delete(':id/lines/:lineId')
+  deleteLine(
+    @CompanyId() companyId: string,
+    @Param('id') id: string,
+    @Param('lineId') lineId: string,
+  ) {
+    return this.invoicesService.deleteLine(companyId, id, lineId);
   }
 
   @Delete(':id')
