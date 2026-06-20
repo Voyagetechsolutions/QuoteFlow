@@ -10,6 +10,7 @@ import {
 } from "../lib/api";
 import { useAsync, cn, type NavigateFn } from "../lib/hooks";
 import { Modal } from "../components/Modal";
+import { WarningIcon, CheckIcon } from "../components/icons";
 
 interface Props {
   rateSetId: string;
@@ -317,13 +318,13 @@ function ReviewTable({
                             key={issue}
                             className="flex items-start gap-1 text-xs text-amber-800"
                           >
-                            <span className="mt-0.5 shrink-0">⚠</span>
+                            <WarningIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                             <span>{issue}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <span className="text-xs text-emerald-600">✓</span>
+                      <CheckIcon className="h-4 w-4 text-emerald-600" />
                     )}
                   </td>
                 </tr>

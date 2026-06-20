@@ -9,6 +9,7 @@ import {
 } from "../lib/api";
 import { useAsync, formatDate, type NavigateFn } from "../lib/hooks";
 import { Modal } from "../components/Modal";
+import { WarningIcon, CheckIcon } from "../components/icons";
 
 interface Props {
   navigate: NavigateFn;
@@ -306,11 +307,12 @@ function ReviewModal({
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {row.issues.length > 0 ? (
-                      <span className="text-amber-800">
-                        ⚠ {row.issues.join("; ")}
+                      <span className="inline-flex items-start gap-1 text-amber-800">
+                        <WarningIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>{row.issues.join("; ")}</span>
                       </span>
                     ) : (
-                      <span className="text-emerald-700">✓</span>
+                      <CheckIcon className="h-4 w-4 text-emerald-700" />
                     )}
                   </td>
                 </tr>
