@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PdfModule } from "./pdf/pdf.module";
 import { MailModule } from "./mail/mail.module";
@@ -15,6 +16,9 @@ import { InvoicesModule } from "./invoices/invoices.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Rate limiting: 100 requests / minute per IP by default. Auth routes are
+    // throttled harder via @Throttle on the controller (brute-force defence).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     PdfModule,
     MailModule,
@@ -25,6 +29,10 @@ import { InvoicesModule } from "./invoices/invoices.module";
     InvoicesModule,
   ],
   controllers: [HealthController],
-  providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
+  providers: [
+    // Throttler first so rate limiting applies before auth work.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AuthGuard },
+  ],
 })
 export class AppModule {}

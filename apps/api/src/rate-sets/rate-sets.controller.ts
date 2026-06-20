@@ -29,7 +29,17 @@ export class RateSetsController {
    * it runs compute (and potentially paid vision calls).
    */
   @Post('extract')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 15 * 1024 * 1024, files: 1 }, // 15 MB cap
+      fileFilter: (_req, file, cb) => {
+        const ok = /pdf|excel|spreadsheet|csv|officedocument/.test(
+          file.mimetype,
+        );
+        cb(ok ? null : new BadRequestException('Unsupported file type.'), ok);
+      },
+    }),
+  )
   extract(@UploadedFile() file?: UploadedRateSheet) {
     if (!file) {
       throw new BadRequestException('No file uploaded (form field "file").');
