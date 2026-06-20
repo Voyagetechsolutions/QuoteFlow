@@ -50,35 +50,28 @@ def run(path: str, model: str | None = None,
     if lower.endswith(".csv"):
         return "table/csv", extract_csv(path)
     if lower.endswith(".pdf"):
-        table_rows = [] if force_vision else extract_pdf(path)
-        flagged = sum(1 for r in table_rows if getattr(r, "needs_review", False))
-        # "Messy / unclear": nothing extracted, forced, or most rows flagged.
-        messy = (
-            force_vision
-            or not table_rows
-            or flagged >= max(1, int(0.6 * len(table_rows)))
-        )
-
-        if messy and os.environ.get("OPENROUTER_API_KEY"):
+        # AI-first: when an OpenRouter key is configured, let the model SEE the
+        # document and arrange it into rows. The deterministic table parser is
+        # the fallback — used when the model is unavailable (no credits,
+        # rate-limited, or it returns nothing), so uploads never hard-fail.
+        if os.environ.get("OPENROUTER_API_KEY") or force_vision:
             from vision_extract import extract_vision, DEFAULT_MODEL
 
             chosen = model or DEFAULT_MODEL
             try:
                 vision_rows = extract_vision(path, chosen, dry_run=False)
-            except Exception as exc:  # vision/network failure — keep table result
-                sys.stderr.write(f"vision fallback failed: {exc}\n")
+            except Exception as exc:
+                sys.stderr.write(
+                    f"vision unavailable, falling back to table parser: {exc}\n")
                 vision_rows = []
-
-            def clean(rs):
-                return sum(1 for r in rs if not getattr(r, "needs_review", False))
-
-            # Use vision only if it read at least as many clean rows.
-            if vision_rows and clean(vision_rows) >= clean(table_rows):
+            if vision_rows:
                 return f"vision/{chosen}", vision_rows
+            if force_vision:
+                raise SystemExit(
+                    "--force-vision: model returned nothing "
+                    "(check OPENROUTER_API_KEY / account credits)")
 
-        if force_vision and not table_rows:
-            raise SystemExit("--force-vision needs OPENROUTER_API_KEY")
-        return "table/pdf", table_rows
+        return "table/pdf", extract_pdf(path)
     raise SystemExit(f"unsupported file type: {path}")
 
 
