@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuoteFlow — Carrier rate sheets into branded quotes, in minutes</title>
+<meta name="description" content="QuoteFlow reads your carriers' rate sheets — PDF, Excel, even scans — and turns them into clean, branded quotes and invoices. Built for SADC freight forwarders." />
+<!--
+  ============================================================
+  EDIT THESE before publishing (search for each):
+    CONTACT_EMAIL   → your business email
+    WHATSAPP_NUMBER → your WhatsApp number, intl format, digits only (e.g. 263771234567)
+    DEMO_VIDEO      → paste a YouTube/Loom embed URL when the demo video is ready
+  Deploy: drag this /landing folder onto netlify.com/drop, or push to GitHub Pages.
+  ============================================================
+-->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a3c5e'/%3E%3Cg fill='%23fff'%3E%3Crect x='9' y='9' width='17' height='3.2' rx='1.6' transform='skewX(-20)'/%3E%3Crect x='12' y='19' width='13' height='3.2' rx='1.6' transform='skewX(-20)'/%3E%3C/g%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --navy: #1a3c5e;
+    --navy-deep: #14304a;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --bg-soft: #f8fafc;
+    --bg-tint: #f1f5f9;
+    --accent: #0f766e;
+    --radius: 14px;
+    --maxw: 1080px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink); background: #fff; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  h1,h2,h3 { line-height: 1.15; letter-spacing: -0.02em; color: #0f223a; }
+  h1 { font-size: clamp(34px, 5.5vw, 56px); font-weight: 800; }
+  h2 { font-size: clamp(26px, 3.6vw, 38px); font-weight: 800; }
+  h3 { font-size: 18px; font-weight: 700; }
+  p.lead { font-size: clamp(17px, 2.2vw, 21px); color: #334155; }
+
+  /* logo */
+  .logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; letter-spacing: -0.03em; }
+  .logo .q { font-weight: 400; }
+  .logo .f { font-weight: 800; }
+  .logo .glyph { display: block; }
+  .logo.navy .q, .logo.navy .f { color: var(--navy); }
+  .logo.light .q { color: #cdd9e6; }
+  .logo.light .f { color: #fff; }
+
+  /* buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px;
+         padding: 12px 20px; border-radius: 10px; cursor: pointer; transition: .15s; border: 1px solid transparent; }
+  .btn-primary { background: var(--navy); color: #fff; }
+  .btn-primary:hover { background: var(--navy-deep); transform: translateY(-1px); }
+  .btn-ghost { background: #fff; color: var(--navy); border-color: var(--line); }
+  .btn-ghost:hover { background: var(--bg-soft); }
+  .btn-light { background: #fff; color: var(--navy); }
+  .btn-light:hover { transform: translateY(-1px); }
+  .btn-outline-light { border-color: rgba(255,255,255,.35); color: #fff; }
+  .btn-outline-light:hover { background: rgba(255,255,255,.08); }
+
+  /* nav */
+  header.nav { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.85);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+
+  /* hero */
+  .hero { padding: 64px 0 40px; background:
+    radial-gradient(1200px 400px at 70% -10%, #eef4fb 0%, rgba(238,244,251,0) 60%); }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
+  .hero .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+  .hero .micro { margin-top: 16px; font-size: 14px; color: var(--muted); }
+
+  /* before/after visual */
+  .showcase { position: relative; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 18px 40px -22px rgba(15,34,58,.35); padding: 16px 18px; }
+  .card .card-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+  .sheet { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; color: #475569; }
+  .sheet .row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #eef1f5; }
+  .sheet .muddle { color: #94a3b8; }
+  .quote-line { display: flex; justify-content: space-between; font-size: 12.5px; padding: 7px 0; border-bottom: 1px solid #f1f5f9; }
+  .quote-line .amt { font-weight: 700; color: #0f223a; font-variant-numeric: tabular-nums; }
+  .quote-top { display:flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .pill { display:inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #e7f6f1; color: #0f766e; }
+  .arrow { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    width: 44px; height: 44px; border-radius: 50%; background: var(--navy); color: #fff;
+    display: grid; place-items: center; box-shadow: 0 10px 24px -8px rgba(26,60,94,.6); z-index: 3; }
+  .stack { display: grid; gap: 26px; }
+
+  /* sections */
+  section { padding: 64px 0; }
+  .section-soft { background: var(--bg-soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .center { text-align: center; max-width: 720px; margin: 0 auto; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 40px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; margin-top: 40px; }
+  .feature { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+  .feature .ic { width: 40px; height: 40px; border-radius: 10px; background: #eef4fb; color: var(--navy);
+    display: grid; place-items: center; margin-bottom: 14px; }
+  .feature p { color: var(--muted); font-size: 15px; margin-top: 6px; }
+
+  /* steps */
+  .steps { counter-reset: step; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 44px; }
+  .step { position: relative; padding-top: 14px; }
+  .step .n { width: 34px; height: 34px; border-radius: 50%; background: var(--navy); color:#fff;
+    font-weight: 700; display: grid; place-items: center; font-size: 15px; }
+  .step h3 { margin: 14px 0 6px; }
+  .step p { color: var(--muted); font-size: 14.5px; }
+
+  /* video */
+  .video-frame { margin-top: 36px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line);
+    background: linear-gradient(160deg, #14304a, #1a3c5e); aspect-ratio: 16/9; display: grid; place-items: center;
+    box-shadow: 0 30px 60px -30px rgba(15,34,58,.5); }
+  .video-frame .play { width: 74px; height: 74px; border-radius: 50%; background: #fff; display:grid; place-items:center;
+    box-shadow: 0 12px 30px -8px rgba(0,0,0,.4); }
+  .video-frame .play svg { margin-left: 4px; }
+  .video-frame .cap { color: #cdd9e6; font-size: 13px; margin-top: 16px; }
+
+  /* sadc strip */
+  .strip { display:flex; flex-wrap: wrap; gap: 10px; justify-content:center; margin-top: 28px; }
+  .chip { border: 1px solid var(--line); background:#fff; border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600; color: #334155; }
+
+  /* big cta */
+  .cta-band { background: linear-gradient(160deg, var(--navy), var(--navy-deep)); color: #fff; border-radius: 22px; padding: 56px 40px; text-align: center; }
+  .cta-band h2 { color: #fff; }
+  .cta-band p { color: #cdd9e6; max-width: 560px; margin: 14px auto 0; font-size: 18px; }
+  .cta-band .cta-row { display:flex; gap:12px; justify-content:center; flex-wrap: wrap; margin-top: 28px; }
+
+  footer { padding: 40px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer .wrap { display:flex; align-items:center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+
+  @media (max-width: 860px) {
+    .hero-grid, .grid-3, .grid-2, .steps { grid-template-columns: 1fr; }
+    .steps { gap: 26px; }
+    .arrow { display: none; }
+    .nav .hide-sm { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<header class="nav">
+  <div class="wrap">
+    <span class="logo navy" aria-label="QuoteFlow">
+      <span><span class="q">Quote</span><span class="f">Flow</span></span>
+      <svg class="glyph" width="26" height="17" viewBox="0 0 30 20" fill="#1a3c5e" aria-hidden="true">
+        <rect x="3" y="3" width="22" height="3.4" rx="1.7" transform="skewX(-20)"/>
+        <rect x="8" y="13" width="17" height="3.4" rx="1.7" transform="skewX(-20)"/>
+      </svg>
+    </span>
+    <a class="btn btn-primary" href="#contact">Book a demo</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">For freight forwarders</span>
+      <h1 style="margin-top:14px;">Messy rate sheet in.<br/>Branded quote out.</h1>
+      <p class="lead" style="margin-top:18px;">
+        QuoteFlow reads your carriers' and agents' rate sheets — PDF, Excel, even scans —
+        and turns them into clean, branded quotes and one-click invoices. No more re-typing,
+        no more margin slips.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#contact">Send us your messiest rate sheet&nbsp;→</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+      <p class="micro">Built for SADC freight — USD &amp; ZAR, FCL containers, POL/POD lanes, local charges.</p>
+    </div>
+
+    <!-- before / after showcase -->
+    <div class="showcase">
+      <div class="stack">
+        <div class="card">
+          <div class="card-h">Your carrier's rate sheet</div>
+          <div class="sheet">
+            <div class="row"><span>POL / POD</span><span class="muddle">20'GP&nbsp;&nbsp;40'HC</span></div>
+            <div class="row"><span>Durban → Mombasa</span><span>1,250&nbsp;&nbsp;1,980</span></div>
+            <div class="row"><span>Cape Town → Mombasa</span><span>1,420&nbsp;&nbsp;2,210</span></div>
+            <div class="row"><span class="muddle">THC per container</span><span>ZAR 2,150</span></div>
+            <div class="row"><span class="muddle">BAF / ISPS / DOC…</span><span class="muddle">see notes</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="quote-top">
+            <div>
+              <div style="font-weight:800; color:#0f223a;">QUOTATION</div>
+              <div style="font-size:12px; color:var(--muted);">QF-2026-0148 · your logo &amp; branding</div>
+            </div>
+            <span class="pill">+ 15% margin applied</span>
+          </div>
+          <div class="quote-line"><span>Ocean Freight Durban→Mombasa (20ft)</span><span class="amt">USD 1,437.50</span></div>
+          <div class="quote-line"><span>Ocean Freight Durban→Mombasa (40ft)</span><span class="amt">USD 2,277.00</span></div>
+          <div class="quote-line"><span>Terminal Handling (THC)</span><span class="amt">ZAR 2,472.50</span></div>
+        </div>
+      </div>
+      <div class="arrow" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section-soft">
+  <div class="wrap center">
+    <span class="eyebrow">The 40-minute quote</span>
+    <h2 style="margin-top:12px;">Quoting a customer shouldn't take half your morning</h2>
+    <p class="lead" style="margin-top:14px; color:var(--muted);">
+      Every quote means reading a different carrier's sheet, finding the right lane and charges,
+      doing the markup math, and re-typing it all — twice, once for the quote and again for the invoice.
+    </p>
+  </div>
+  <div class="wrap">
+    <div class="grid-3">
+      <div class="feature"><div class="ic">⏱️</div><h3>Slow</h3><p>20–40 minutes of reading and re-keying for a single quote — per enquiry.</p></div>
+      <div class="feature"><div class="ic">⚠️</div><h3>Error-prone</h3><p>A mistyped rate or wrong container basis becomes a quote you can't honour.</p></div>
+      <div class="feature"><div class="ic">🌀</div><h3>Inconsistent</h3><p>Every carrier's sheet looks different, and your quotes end up looking different too.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap center">
+    <span class="eyebrow">How it works</span>
+    <h2 style="margin-top:12px;">Rate sheet to invoice in four steps</h2>
+  </div>
+  <div class="wrap">
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Upload the sheet</h3><p>PDF, Excel, CSV or a scan. QuoteFlow extracts every lane, charge and rate.</p></div>
+      <div class="step"><div class="n">2</div><h3>Review the rates</h3><p>Extracted rows land in an editable table. Anything uncertain is flagged — a 10-second fix, not a re-type.</p></div>
+      <div class="step"><div class="n">3</div><h3>Generate the quote</h3><p>Pick the customer, set your margin, and a priced, branded quote is ready to send.</p></div>
+      <div class="step"><div class="n">4</div><h3>One-click invoice</h3><p>When it's accepted, turn the quote into a branded invoice in a single click.</p></div>
+    </div>
+
+    <!-- demo video placeholder -->
+    <a class="video-frame" href="#contact" aria-label="Watch the demo">
+      <div style="text-align:center;">
+        <div class="play"><svg width="26" height="26" viewBox="0 0 24 24" fill="#1a3c5e"><path d="M8 5v14l11-7z"/></svg></div>
+        <div class="cap">90-second demo — coming soon. <u>Book a live walkthrough →</u></div>
+      </div>
+      <!-- DEMO_VIDEO: replace this whole .video-frame with a YouTube/Loom <iframe> when ready -->
+    </a>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section-soft">
+  <div class="wrap center">
+    <span class="eyebrow">Why forwarders use it</span>
+    <h2 style="margin-top:12px;">Built for how freight actually prices</h2>
+  </div>
+  <div class="wrap">
+    <div class="grid-3">
+      <div class="feature"><div class="ic">📄</div><h3>Reads any sheet</h3><p>POL/POD lanes, 20'/40' container columns, THC, BAF, CAF, ISPS, documentation — recognised and normalised.</p></div>
+      <div class="feature"><div class="ic">✅</div><h3>You stay in control</h3><p>Every rate lands in a review table before it becomes a quote. Rates and currencies flag for a quick check — never a silent wrong number.</p></div>
+      <div class="feature"><div class="ic">🎨</div><h3>Your branding</h3><p>Quotes and invoices carry your company logo and name — not ours.</p></div>
+      <div class="feature"><div class="ic">📈</div><h3>Margin done for you</h3><p>Set a markup and QuoteFlow does cost → sell → margin. No spreadsheet, no fudging.</p></div>
+      <div class="feature"><div class="ic">💱</div><h3>USD &amp; ZAR together</h3><p>Mixed-currency sheets stay correct — USD ocean freight and ZAR local charges, side by side.</p></div>
+      <div class="feature"><div class="ic">🔁</div><h3>Quote → invoice</h3><p>One accepted quote becomes an invoice in a click. Edit any line before you send.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SADC -->
+<section>
+  <div class="wrap center">
+    <span class="eyebrow">Made for the region</span>
+    <h2 style="margin-top:12px;">Speaks Southern African freight</h2>
+    <p class="lead" style="margin-top:14px; color:var(--muted);">Hard-coded for the lanes, charges and currencies you actually quote.</p>
+    <div class="strip">
+      <span class="chip">Durban</span><span class="chip">Cape Town</span><span class="chip">Walvis Bay</span>
+      <span class="chip">Harare</span><span class="chip">Lusaka</span><span class="chip">Lilongwe</span>
+      <span class="chip">Gaborone</span><span class="chip">USD / ZAR / ZWL</span><span class="chip">FCL · LCL</span>
+      <span class="chip">POL / POD</span><span class="chip">THC · BAF · ISPS</span>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT / CTA -->
+<section id="contact">
+  <div class="wrap">
+    <div class="cta-band">
+      <span class="eyebrow" style="color:#9ec3e8;">Free, no commitment</span>
+      <h2 style="margin-top:12px;">Send us your messiest rate sheet</h2>
+      <p>We'll run it through QuoteFlow and send back a clean, branded quote — so you can see exactly what it does with <em>your</em> carriers' sheets. No sign-up required.</p>
+      <div class="cta-row">
+        <!-- CONTACT_EMAIL -->
+        <a class="btn btn-light" href="mailto:mthokochaza@gmail.com?subject=QuoteFlow%20-%20here%27s%20my%20rate%20sheet&body=Hi%2C%20I%27ve%20attached%20a%20rate%20sheet.%20Please%20send%20me%20back%20a%20sample%20quote.">Email a rate sheet</a>
+        <!-- WHATSAPP_NUMBER -->
+        <a class="btn btn-outline-light" href="https://wa.me/WHATSAPP_NUMBER?text=Hi%2C%20I%27d%20like%20to%20try%20QuoteFlow%20with%20my%20rate%20sheet." target="_blank" rel="noopener">WhatsApp us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <span class="logo navy" style="font-size:18px;">
+      <span><span class="q">Quote</span><span class="f">Flow</span></span>
+      <svg width="22" height="14" viewBox="0 0 30 20" fill="#1a3c5e" aria-hidden="true">
+        <rect x="3" y="3" width="22" height="3.4" rx="1.7" transform="skewX(-20)"/>
+        <rect x="8" y="13" width="17" height="3.4" rx="1.7" transform="skewX(-20)"/>
+      </svg>
+    </span>
+    <span>Quotes &amp; invoices for freight forwarders · <a href="mailto:mthokochaza@gmail.com" style="color:var(--navy);font-weight:600;">mthokochaza@gmail.com</a></span>
+    <span>© 2026 QuoteFlow</span>
+  </div>
+</footer>
+
+</body>
+</html>
