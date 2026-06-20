@@ -50,18 +50,35 @@ def run(path: str, model: str | None = None,
     if lower.endswith(".csv"):
         return "table/csv", extract_csv(path)
     if lower.endswith(".pdf"):
-        rows = [] if force_vision else extract_pdf(path)
-        if rows:
-            return "table/pdf", rows
-        # No extractable tables (or forced) — use vision if we have a key.
-        if os.environ.get("ANTHROPIC_API_KEY"):
+        table_rows = [] if force_vision else extract_pdf(path)
+        flagged = sum(1 for r in table_rows if getattr(r, "needs_review", False))
+        # "Messy / unclear": nothing extracted, forced, or most rows flagged.
+        messy = (
+            force_vision
+            or not table_rows
+            or flagged >= max(1, int(0.6 * len(table_rows)))
+        )
+
+        if messy and os.environ.get("OPENROUTER_API_KEY"):
             from vision_extract import extract_vision, DEFAULT_MODEL
 
             chosen = model or DEFAULT_MODEL
-            return f"vision/{chosen}", extract_vision(path, chosen, dry_run=False)
-        if force_vision:
-            raise SystemExit("--force-vision needs ANTHROPIC_API_KEY")
-        return "table/pdf", rows  # empty; caller sees rowCount 0
+            try:
+                vision_rows = extract_vision(path, chosen, dry_run=False)
+            except Exception as exc:  # vision/network failure — keep table result
+                sys.stderr.write(f"vision fallback failed: {exc}\n")
+                vision_rows = []
+
+            def clean(rs):
+                return sum(1 for r in rs if not getattr(r, "needs_review", False))
+
+            # Use vision only if it read at least as many clean rows.
+            if vision_rows and clean(vision_rows) >= clean(table_rows):
+                return f"vision/{chosen}", vision_rows
+
+        if force_vision and not table_rows:
+            raise SystemExit("--force-vision needs OPENROUTER_API_KEY")
+        return "table/pdf", table_rows
     raise SystemExit(f"unsupported file type: {path}")
 
 

@@ -15,9 +15,10 @@ Flow:
   4. Run the SAME validate_row() flagging as the table path, so the review table
      behaves identically regardless of which extractor produced the row.
 
-Auth: needs ANTHROPIC_API_KEY (Anthropic Console key). Claude Code OAuth does
-NOT drive an automated script. Without a key use --dry-run, which skips the
-network call and feeds a recorded response through parse + validate.
+Auth: needs OPENROUTER_API_KEY (https://openrouter.ai/keys). The model is an
+OpenRouter model id via OPENROUTER_MODEL (default openai/gpt-4o; paid models
+need account credits). Without a key use --dry-run, which skips the network
+call and feeds a recorded response through parse + validate.
 
 Usage:
     export ANTHROPIC_API_KEY=sk-ant-...
@@ -41,9 +42,12 @@ import fitz  # PyMuPDF
 
 from extract import RateRow, validate_row, charge_type_for, KNOWN_CURRENCIES
 
-# Vision model. Sonnet 4.6 balances vision accuracy and cost for high-volume
-# extraction; override with --model. Opus 4.8 for the hardest scans.
-DEFAULT_MODEL = "claude-sonnet-4-6"
+# Vision model — an OpenRouter model id (OpenAI-compatible). Override with
+# --model or the OPENROUTER_MODEL env var. gpt-4o is a strong, reliable default
+# for messy document extraction; cheaper options: openai/gpt-4o-mini,
+# google/gemini-flash-1.5, anthropic/claude-3.5-sonnet.
+DEFAULT_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 PROMPT = """You are extracting a freight forwarder's rate sheet from an image.
 
@@ -129,24 +133,38 @@ def load_images(path: str, dpi: int = 200) -> list[tuple[bytes, str]]:
 # --- model call --------------------------------------------------------------
 
 def call_vision(image_bytes: bytes, media_type: str, model: str) -> str:
-    """Send one image to the vision model; return the raw text response."""
-    import anthropic  # imported lazily so --dry-run needs no key/network
+    """Send one page image to an OpenRouter vision model; return the raw text."""
+    import httpx  # imported lazily so --dry-run needs no key/network
 
-    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise SystemExit("OPENROUTER_API_KEY not set.")
+
     b64 = base64.standard_b64encode(image_bytes).decode("ascii")
-    msg = client.messages.create(
-        model=model,
-        max_tokens=4096,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {
-                    "type": "base64", "media_type": media_type, "data": b64}},
-                {"type": "text", "text": PROMPT},
-            ],
-        }],
+    data_url = f"data:{media_type};base64,{b64}"
+    resp = httpx.post(
+        OPENROUTER_URL,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://quoteflow.app",
+            "X-Title": "QuoteFlow",
+        },
+        json={
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": PROMPT},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }],
+        },
+        timeout=120,
     )
-    return "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"] or ""
 
 
 # --- parsing -----------------------------------------------------------------
