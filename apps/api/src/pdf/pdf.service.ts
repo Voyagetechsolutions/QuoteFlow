@@ -30,6 +30,20 @@ export class PdfService implements OnModuleDestroy {
     const page = await browser.newPage();
     try {
       await page.setContent(html, { waitUntil: "networkidle" });
+      // Wait for any images (e.g. a data-URL company logo) to finish decoding —
+      // networkidle doesn't cover data: URLs, so the logo could miss the render.
+      await page.evaluate(() =>
+        Promise.all(
+          Array.from(document.images).map((img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => {
+                  img.onload = () => resolve();
+                  img.onerror = () => resolve();
+                }),
+          ),
+        ),
+      );
       return await page.pdf({
         format: "A4",
         printBackground: true,

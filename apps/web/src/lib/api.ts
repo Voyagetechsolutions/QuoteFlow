@@ -191,6 +191,33 @@ export function deleteRateSet(id: string): Promise<void> {
   return request(`/api/rate-sets/${id}`, { method: "DELETE" });
 }
 
+// ─── Company ────────────────────────────────────────────────────
+
+export interface Company {
+  id: string;
+  name: string;
+  logo: string | null;
+  createdAt: string;
+}
+
+export const getCompany = (): Promise<Company> =>
+  request<Company>("/api/company");
+
+export const updateCompanyName = (name: string): Promise<Company> =>
+  request<Company>("/api/company", {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+
+export function uploadCompanyLogo(file: File): Promise<Company> {
+  const body = new FormData();
+  body.append("file", file);
+  return request<Company>("/api/company/logo", { method: "POST", body });
+}
+
+export const deleteCompanyLogo = (): Promise<Company> =>
+  request<Company>("/api/company/logo", { method: "DELETE" });
+
 // ─── Customers ──────────────────────────────────────────────────
 
 export interface Customer {

@@ -49,7 +49,7 @@ export class InvoicesController {
         })),
         total: inv.total,
       },
-      { name: company?.name ?? 'QuoteFlow' },
+      { name: company?.name ?? 'QuoteFlow', logo: company?.logo },
     );
     return { buffer: await this.pdf.render(html), inv, company };
   }

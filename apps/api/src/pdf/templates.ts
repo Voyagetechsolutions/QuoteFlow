@@ -8,6 +8,7 @@
 
 interface Company {
   name: string;
+  logo?: string | null; // data URL
 }
 interface Customer {
   name: string;
@@ -116,7 +117,11 @@ export function documentHtml(doc: DocModel, company: Company): string {
 </style></head>
 <body>
   <div class="head">
-    <div class="brand">${esc(company.name)}<span class="tag">Freight forwarding</span></div>
+    <div class="brand">${
+      company.logo
+        ? `<img src="${esc(company.logo)}" alt="${esc(company.name)}" height="52" style="height:52px;width:auto;max-width:260px;display:block" />`
+        : `${esc(company.name)}<span class="tag">Freight forwarding</span>`
+    }</div>
     <div class="doc-meta">
       <div class="doc-type">${doc.kind}</div>
       <div class="doc-num">${esc(doc.number)}</div>

@@ -33,6 +33,7 @@ enum InvoiceStatus {
 model Company {
   id        String   @id @default(cuid())
   name      String
+  logo      String? // data URL (base64) of the company logo, shown on PDFs
   createdAt DateTime @default(now())
 
   users     User[]

@@ -8,6 +8,7 @@ import { QuoteBuilderPage } from "./pages/QuoteBuilderPage";
 import { QuoteDetailPage } from "./pages/QuoteDetailPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { CustomersPage } from "./pages/CustomersPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export function App() {
   const [page, setPage] = useState<Page>({ name: "rate-sets" });
@@ -52,6 +53,8 @@ function PageRenderer({
       return <InvoicesPage navigate={navigate} />;
     case "customers":
       return <CustomersPage navigate={navigate} />;
+    case "settings":
+      return <SettingsPage navigate={navigate} />;
     default:
       return <RateSetsPage navigate={navigate} />;
   }

@@ -10,7 +10,8 @@ export type Page =
   | { name: "quote-detail"; id: string }
   | { name: "invoices" }
   | { name: "invoice-detail"; id: string }
-  | { name: "customers" };
+  | { name: "customers" }
+  | { name: "settings" };
 
 export type NavigateFn = (page: Page) => void;
 

@@ -7,6 +7,7 @@ import { PdfModule } from "./pdf/pdf.module";
 import { MailModule } from "./mail/mail.module";
 import { AuthModule } from "./auth/auth.module";
 import { AuthGuard } from "./auth/auth.guard";
+import { CompanyModule } from "./company/company.module";
 import { HealthController } from "./health/health.controller";
 import { RateSetsModule } from "./rate-sets/rate-sets.module";
 import { CustomersModule } from "./customers/customers.module";
@@ -23,6 +24,7 @@ import { InvoicesModule } from "./invoices/invoices.module";
     PdfModule,
     MailModule,
     AuthModule,
+    CompanyModule,
     RateSetsModule,
     CustomersModule,
     QuotesModule,
