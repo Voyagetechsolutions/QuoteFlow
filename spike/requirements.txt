@@ -1,0 +1,5 @@
+# Python deps for the extraction service (the API shells out to these).
+pdfplumber==0.11.10
+openpyxl==3.1.5
+pymupdf==1.27.2.3
+httpx==0.28.1

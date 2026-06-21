@@ -24,7 +24,13 @@ export class MailService {
   private readonly from: string;
   readonly configured: boolean;
 
+  private readonly enabled: boolean;
+
   constructor(config: ConfigService) {
+    // Email can be turned off entirely (EMAIL_ENABLED=false) — send endpoints
+    // then return a clear "disabled" result instead of building/sending.
+    this.enabled = config.get<string>('EMAIL_ENABLED') !== 'false';
+
     const host = config.get<string>('SMTP_HOST');
     this.from =
       config.get<string>('SMTP_FROM') ??
@@ -48,6 +54,10 @@ export class MailService {
   }
 
   async sendDocument(opts: SendDocumentOptions) {
+    if (!this.enabled) {
+      this.logger.warn(`Email disabled (EMAIL_ENABLED=false) — not sending to ${opts.to}.`);
+      return { sent: false, disabled: true, to: opts.to };
+    }
     const info = await this.transporter.sendMail({
       from: this.from,
       to: opts.to,

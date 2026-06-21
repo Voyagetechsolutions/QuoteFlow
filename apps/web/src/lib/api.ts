@@ -1,6 +1,7 @@
 /**
  * QuoteFlow API client.
- * Vite proxies /api → http://localhost:3000, so base URL is empty.
+ * In dev, Vite proxies /api → http://localhost:3000 (base empty). In production,
+ * set VITE_API_BASE_URL to the deployed API origin (e.g. https://api.quoteflow…).
  */
 
 import type {
@@ -9,6 +10,9 @@ import type {
   QuoteStatus,
   InvoiceStatus,
 } from "@quoteflow/shared";
+
+// Deployed API origin; empty in dev (relative paths go through the Vite proxy).
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 // ─── Generic helpers ────────────────────────────────────────────
 
@@ -24,7 +28,7 @@ async function request<T>(
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(url, { ...opts, headers });
+  const res = await fetch(API_BASE + url, { ...opts, headers });
 
   if (res.status === 401 && !url.startsWith("/api/auth")) {
     // Session expired/invalid — drop it and let the app fall back to login.
@@ -95,7 +99,7 @@ export const logout = (): void => {
  */
 export async function openAuthedPdf(path: string): Promise<void> {
   const token = getToken();
-  const res = await fetch(path, {
+  const res = await fetch(API_BASE + path, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
