@@ -9,6 +9,8 @@
 interface Company {
   name: string;
   logo?: string | null; // data URL
+  vatNumber?: string | null;
+  vatRate?: number;
 }
 interface Customer {
   name: string;
@@ -81,6 +83,15 @@ export function documentHtml(doc: DocModel, company: Company): string {
 
   const dateLabel = doc.kind === "INVOICE" ? "Invoice date" : "Quote date";
 
+  // VAT applies only when the company is VAT-registered (has a VAT number).
+  const vatApplies = Boolean(company.vatNumber && company.vatNumber.trim());
+  const vatRate = company.vatRate ?? 15;
+  const subtotal = doc.total;
+  const vat = vatApplies ? Math.round(subtotal * vatRate) / 100 : 0;
+  const grandTotal = subtotal + vat;
+  const docType =
+    doc.kind === "INVOICE" && vatApplies ? "TAX INVOICE" : doc.kind;
+
   return `<!doctype html>
 <html><head><meta charset="utf-8"><style>
   * { box-sizing: border-box; }
@@ -123,9 +134,14 @@ export function documentHtml(doc: DocModel, company: Company): string {
         : `${esc(company.name)}<span class="tag">Freight forwarding</span>`
     }</div>
     <div class="doc-meta">
-      <div class="doc-type">${doc.kind}</div>
+      <div class="doc-type">${docType}</div>
       <div class="doc-num">${esc(doc.number)}</div>
       <div class="badge">${esc(doc.status)}</div>
+      ${
+        vatApplies
+          ? `<div style="font-size:11px;color:#64748b;margin-top:6px">VAT No. ${esc(company.vatNumber)}</div>`
+          : ""
+      }
     </div>
   </div>
 
@@ -154,7 +170,13 @@ export function documentHtml(doc: DocModel, company: Company): string {
 
   <div class="totals">
     <table>
-      <tr class="grand"><td>Total</td><td class="amt">${money(doc.total, doc.currency)}</td></tr>
+      ${
+        vatApplies
+          ? `<tr><td>Subtotal</td><td class="amt">${money(subtotal, doc.currency)}</td></tr>
+      <tr><td>VAT (${vatRate}%)</td><td class="amt">${money(vat, doc.currency)}</td></tr>`
+          : ""
+      }
+      <tr class="grand"><td>Total${vatApplies ? " incl. VAT" : ""}</td><td class="amt">${money(grandTotal, doc.currency)}</td></tr>
     </table>
   </div>
 

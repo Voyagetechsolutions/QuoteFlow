@@ -201,16 +201,22 @@ export interface Company {
   id: string;
   name: string;
   logo: string | null;
+  vatNumber: string | null;
+  vatRate: number;
   createdAt: string;
 }
 
 export const getCompany = (): Promise<Company> =>
   request<Company>("/api/company");
 
-export const updateCompanyName = (name: string): Promise<Company> =>
+export const updateCompany = (data: {
+  name?: string;
+  vatNumber?: string;
+  vatRate?: number;
+}): Promise<Company> =>
   request<Company>("/api/company", {
     method: "PATCH",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(data),
   });
 
 export function uploadCompanyLogo(file: File): Promise<Company> {

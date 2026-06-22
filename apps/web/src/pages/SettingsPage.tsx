@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   getCompany,
-  updateCompanyName,
+  updateCompany,
   uploadCompanyLogo,
   deleteCompanyLogo,
   type Company,
@@ -37,16 +37,34 @@ function SettingsForm({
   const [name, setName] = useState(company.name);
   const [savingName, setSavingName] = useState(false);
   const [busyLogo, setBusyLogo] = useState(false);
+  const [vatNumber, setVatNumber] = useState(company.vatNumber ?? "");
+  const [vatRate, setVatRate] = useState(String(company.vatRate ?? 15));
+  const [savingVat, setSavingVat] = useState(false);
 
   async function saveName() {
     setSavingName(true);
     try {
-      await updateCompanyName(name.trim() || company.name);
+      await updateCompany({ name: name.trim() || company.name });
       onChanged();
     } catch {
       alert("Could not save the company name.");
     } finally {
       setSavingName(false);
+    }
+  }
+
+  async function saveVat() {
+    setSavingVat(true);
+    try {
+      await updateCompany({
+        vatNumber: vatNumber.trim(),
+        vatRate: Number(vatRate) || 0,
+      });
+      onChanged();
+    } catch {
+      alert("Could not save VAT settings.");
+    } finally {
+      setSavingVat(false);
     }
   }
 
@@ -108,6 +126,47 @@ function SettingsForm({
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
           >
             {savingName ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </section>
+
+      {/* VAT / tax */}
+      <section className="mt-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">VAT / tax</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          If you're VAT-registered, enter your VAT number — invoices then show as
+          a <span className="font-semibold">TAX INVOICE</span> with VAT added.
+          Leave blank if you're not registered.
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <label className="flex-1">
+            <span className="mb-1 block text-xs font-medium text-slate-500">
+              VAT number
+            </span>
+            <input
+              value={vatNumber}
+              onChange={(e) => setVatNumber(e.target.value)}
+              placeholder="e.g. 4123456789"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+            />
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-medium text-slate-500">
+              VAT %
+            </span>
+            <input
+              type="number"
+              value={vatRate}
+              onChange={(e) => setVatRate(e.target.value)}
+              className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+            />
+          </label>
+          <button
+            onClick={saveVat}
+            disabled={savingVat}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+          >
+            {savingVat ? "Saving…" : "Save"}
           </button>
         </div>
       </section>

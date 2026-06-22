@@ -55,7 +55,12 @@ export class InvoicesController {
         })),
         total: inv.total,
       },
-      { name: company?.name ?? 'QuoteFlow', logo: company?.logo },
+      {
+        name: company?.name ?? 'QuoteFlow',
+        logo: company?.logo,
+        vatNumber: company?.vatNumber,
+        vatRate: company?.vatRate,
+      },
     );
     return { buffer: await this.pdf.render(html), inv, company };
   }

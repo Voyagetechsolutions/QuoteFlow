@@ -34,6 +34,8 @@ model Company {
   id        String   @id @default(cuid())
   name      String
   logo      String? // data URL (base64) of the company logo, shown on PDFs
+  vatNumber String? // VAT registration number; VAT only applies when this is set
+  vatRate   Float    @default(15) // VAT percentage (SA = 15)
   createdAt DateTime @default(now())
 
   users     User[]

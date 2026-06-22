@@ -29,8 +29,8 @@ export class CompanyController {
   }
 
   @Patch()
-  updateName(@CompanyId() companyId: string, @Body() body: UpdateCompanyDto) {
-    return this.companyService.updateName(companyId, body.name);
+  update(@CompanyId() companyId: string, @Body() body: UpdateCompanyDto) {
+    return this.companyService.update(companyId, body);
   }
 
   /** Upload a company logo (image, <=1 MB) — stored as a data URL, shown on PDFs. */
